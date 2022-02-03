@@ -1,0 +1,51 @@
+
+
+files:
+  - {
+      type: "ereg_det_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/Verificaciones/Determin_archivos_hind/",
+      name: "determin_prec_mme_Apr_MJJ_gp_01_mean_cor_wsereg_hind.npz",
+      first_year_in_file: 1982,
+    }
+  - {
+      type: "ereg_prob_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/Verificaciones/Prob_archivos_hind/",
+      name: "prec_mme_Apr_MJJ_gp_01_mean_cor_wsereg_hind.npz",
+      first_year_in_file: 1982,
+    }
+  - {
+      type: "crcsas_obs_data",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/input/raw_data/crcsas/",
+      name: "prcp_crcsas.csv",
+    }
+  - {
+      type: "cpt_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
+      name: "ecmwf_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt",
+      filter_years: {
+        min_year: 2022,
+      },
+    }
+  - {
+      type: "cpt_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
+      name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt",
+      swap_years: {
+        last_hindcast_year: 2020,
+        first_forecast_year: 2022,
+      },
+    }
+  - {
+      type: "cpt_predictand",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/input/predictands/",
+      name: "prcp_chirps_12-2.txt",
+    }
+  - {
+      type: "cpt_predictor",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/input/predictors/",
+      name: "nmme_precip_Janic_2_1991-2020_2022_1.txt",
+      swap_years: {
+        last_hindcast_year: 2020,
+        first_forecast_year: 2022,
+      },
+    }
