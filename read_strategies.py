@@ -350,9 +350,6 @@ class ReadEregPROBoutput(ReadStrategy):
         first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
             if file_config is not None else DEFAULT_START_YEAR
 
-        #
-        kernel = Gaussian2DKernel(x_stddev=1)
-
         # Leer archivo de tipo npz
         with np.load(file_name) as npz:
             # Identificar variable con datos
@@ -363,22 +360,12 @@ class ReadEregPROBoutput(ReadStrategy):
             # Nombre de dimensiones: ['category', 'time', 'latitude', 'longitude']
             for_terciles = np.squeeze(npz[data_variable][:, :, :, :])
 
-            # Se ajustan los pronósticos (por qué?)
-            if file_variable == 'prcp':
-                below = ndimage.filters.gaussian_filter(for_terciles[0, :, :, :], 1, order=0,
-                                                        output=None, mode='reflect')
-                near = ndimage.filters.gaussian_filter(for_terciles[1, :, :, :], 1, order=0,
-                                                       output=None, mode='reflect')
-            elif file_variable == 't2m':
-                for_terciles[:, for_terciles[1, :, :, :] == 0] = np.nan
-                below = convolve(for_terciles[0, :, :, :], kernel,
-                                 nan_treatment='interpolate', preserve_nan=True)
-                near = convolve(for_terciles[1, :, :, :], kernel, nan_treatment='interpolate',
-                                preserve_nan=True)
+            # Se extraen las probabilidades en el archivo npz
+            below = for_terciles[0, :, :, :]
+            near = for_terciles[1, :, :, :]
             # Se calcula la probabilidad de un evento superior a la media
-            # TODO: preguntar a Mechi si esto es correcto (no entiendo que se hace)
-            above = 1 - near
-            near = near - below
+            above = 1 - near  # TODO: preguntar a Mechi si esto es correcto
+            near = near - below  # TODO: preguntar a Mechi si esto es correcto
 
             # Se crea la metríz con la que se creará el dataset
             for_terciles = np.concatenate([below[:, :, :, np.newaxis], near[:, :, :, np.newaxis],
