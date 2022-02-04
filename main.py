@@ -2,8 +2,9 @@ import os.path
 
 from configuration import ConfigFile, ConfigError
 from read_strategies import FileReader
-from read_strategies import ReadEregDEToutput, ReadEregPROBoutput, ReadCRCSASobs, \
-    ReadCPToutput, ReadCPTpredictand, ReadCPTpredictor
+from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, \
+    ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor, \
+    ReadCRCSASobs
 
 if __name__ == '__main__':
 
@@ -16,13 +17,15 @@ if __name__ == '__main__':
         # Definir la estrategia de lectura del archivo
         read_strategy = None
         if f.get('type') == 'ereg_det_output':
-            read_strategy = ReadEregDEToutput()
+            read_strategy = ReadEREGoutputDET()
         elif f.get('type') == 'ereg_prob_output':
-            read_strategy = ReadEregPROBoutput()
+            read_strategy = ReadEREGoutputPROB()
         elif f.get('type') == 'crcsas_obs_data':
             read_strategy = ReadCRCSASobs()
-        elif f.get('type') == 'cpt_output':
-            read_strategy = ReadCPToutput()
+        elif f.get('type') == 'cpt_det_output':
+            read_strategy = ReadCPToutputDET()
+        elif f.get('type') == 'cpt_prob_output':
+            read_strategy = ReadCPToutputPROB()
         elif f.get('type') == 'cpt_predictand':
             read_strategy = ReadCPTpredictand()
         elif f.get('type') == 'cpt_predictor':

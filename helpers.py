@@ -51,7 +51,8 @@ class CPToutputFileInfo(object):
     na_values: Union[int, float, str]
     header_line: int
     data_first_line: int
-    data_last_line: int
+    field_n_rows: int
+    header_n_rows: int
 
 
 @dataclass

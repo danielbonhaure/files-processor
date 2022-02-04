@@ -53,19 +53,7 @@ files:
       },
     }
   - {
-      type: "cpt_output",
-      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
-      name: "ecmwf_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt",
-      filter_years: {
-        min_year: 2022,
-        max_year: 2022,
-      },
-      output_file: {
-        path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
-      },
-    }
-  - {
-      type: "cpt_output",
+      type: "cpt_det_output",
       path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
       name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt",
       swap_years: {
@@ -77,7 +65,7 @@ files:
       },
     }
   - {
-      type: "cpt_output",
+      type: "cpt_det_output",
       path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
       name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt",
       swap_years: {
@@ -94,7 +82,7 @@ files:
       },
     }
   - {
-      type: "cpt_output",
+      type: "cpt_det_output",
       path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
       name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt",
       swap_years: {
@@ -108,6 +96,52 @@ files:
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
         name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_forecast.nc"
+      },
+    }
+  - {
+      type: "cpt_prob_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
+      name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob.txt",
+      swap_years: {
+        last_hindcast_year: 2020,
+        first_forecast_year: 2022,
+      },
+      output_file: {
+        path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
+      },
+    }
+  - {
+      type: "cpt_prob_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
+      name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob.txt",
+      swap_years: {
+        last_hindcast_year: 2020,
+        first_forecast_year: 2022,
+      },
+      filter_years: {
+        min_year: 1991,
+        max_year: 2020,
+      },
+      output_file: {
+        path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
+        name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob_hindcast.txt"
+      },
+    }
+  - {
+      type: "cpt_prob_output",
+      path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
+      name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob.txt",
+      swap_years: {
+        last_hindcast_year: 2020,
+        first_forecast_year: 2022,
+      },
+      filter_years: {
+        min_year: 2022,
+        max_year: 2022,
+      },
+      output_file: {
+        path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
+        name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob_forecast.no"
       },
     }
   - {
