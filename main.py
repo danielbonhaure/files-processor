@@ -33,10 +33,10 @@ if __name__ == '__main__':
         # Definir el objeto encargado de leer y convertir el archivo
         reader = FileReader(read_strategy)
 
-        if f.get('name') == 'nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1.txt':
-            stop = True
+        # Definir nombre del archivo a leer
+        file_name = os.path.join(f.get('path'), f.get('name'))
 
         # Convertir archivo a NetCDF
-        reader.convert_file_to_netcdf(os.path.join(f.get('path'), f.get('name')))
+        reader.convert_file_to_netcdf(file_name, file_config=f)
 
 

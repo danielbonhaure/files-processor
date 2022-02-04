@@ -26,15 +26,9 @@ class ConfigFile:
         return self._file_name
 
     @file_name.setter
-    def file_name(self, value) -> None:
+    def file_name(self, value: str) -> None:
         self._file_name = value
         self.cpt_config = self.__load_config()
 
-    def get(self, key, default=None) -> Any:
+    def get(self, key, default: Any = None) -> Any:
         return self.cpt_config.get(key, default)
-
-    def find_file_config(self, file_name) -> dict:
-        for f in self.get('files'):
-            if os.path.join(f.get('path'), f.get('name')) == file_name:
-                return f
-        return {}

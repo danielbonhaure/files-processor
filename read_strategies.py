@@ -1,10 +1,11 @@
 
 from __future__ import annotations
+
+import os.path
 from abc import ABC, abstractmethod
 from typing import List
 
 from pandas import DataFrame
-from os.path import splitext
 from scipy import ndimage
 from astropy.convolution import convolve
 from astropy.convolution import Gaussian2DKernel
@@ -12,9 +13,9 @@ from datetime import datetime
 
 from helpers import CPToutputFileInfo, CPTpredictorFileInfo
 from helpers import MonthsProcessor as Mpro
-from configuration import ConfigFile
 
 import re
+import os.path
 import pandas as pd
 import numpy as np
 import xarray as xr
@@ -42,32 +43,36 @@ class FileReader(object):
     def read_strategy(self, strategy: ReadStrategy) -> None:
         self._read_strategy = strategy
 
-    def read_file(self, file_name: str) -> DataFrame:
+    def read_file(self, file_name: str, file_config: dict = None) -> DataFrame:
         # Leer los datos en el archivo (en un dataframe)
         final_df = self._read_strategy.read_data(file_name)
 
-        # Leer archivo de configuración e identificar configuración del archivo actual
-        config = ConfigFile.Instance()
-        file_config = config.find_file_config(file_name)
-
-        # Filtrar años, en caso que sea necesario
-        if file_config.get('filter_years', False):
-            min_year = file_config.get('filter_years').get('min_year', False)
-            if min_year:
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
                 final_df = final_df.loc[final_df.index.get_level_values('time').year >= min_year]
-            max_year = file_config.get('filter_years').get('max_year', False)
-            if max_year:
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
                 final_df = final_df.loc[final_df.index.get_level_values('time').year <= max_year]
 
         # Retornar el df con los datos leídos del archivo
         return final_df
 
-    def convert_file_to_netcdf(self, file_name: str) -> None:
+    def convert_file_to_netcdf(self, file_name: str, file_config: dict = None) -> None:
         # Leer los datos en el archivo (en un dataframe)
-        final_df = self.read_file(file_name)
+        final_df = self.read_file(file_name, file_config)
+
+        # Definir el nombre del archivo NetCDF
+        output_file_name = f"{os.path.splitext(file_name)[0]}.nc"
+        if file_config is not None and file_config.get('output_file') is not None:
+            output_path = file_config.get('output_file').get('path', os.path.dirname(output_file_name))
+            output_file = file_config.get('output_file').get('name', os.path.basename(output_file_name))
+            output_file_name = os.path.join(output_path, output_file)
+
         # Convertir pandas dataframe a xarray dataset y guardarlo en un archivo netcdf
         with final_df.to_xarray() as ds:
-            ds.to_netcdf(f"{splitext(file_name)[0]}.nc")
+            ds.to_netcdf(output_file_name)
 
 
 class ReadStrategy(ABC):
@@ -75,7 +80,7 @@ class ReadStrategy(ABC):
     The Strategy Interface (Desing Pattern -> Strategy)
     """
     @abstractmethod
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         pass
 
 
@@ -83,7 +88,7 @@ class ReadCPToutput(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         # Extraer información del archivo CPT
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
@@ -119,12 +124,8 @@ class ReadCPToutput(ReadStrategy):
             year_data_df.insert(2, 'time', pd.to_datetime(f'{year}-{forecast_month}-01'))
             final_df = pd.concat([final_df, year_data_df])
 
-        # Leer archivo de configuración e identificar configuración del archivo actual
-        config = ConfigFile.Instance()
-        file_config = config.find_file_config(file_name)
-
         # Modificar años, en caso que sea necesario
-        if file_config.get('swap_years', False):
+        if file_config is not None and file_config.get('swap_years') is not None:
 
             # Obtener ultimo año de hindcast y primer año pronosticado
             last_hindcast_year = file_config.get('swap_years').get('last_hindcast_year')
@@ -180,7 +181,7 @@ class ReadCPTpredictand(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         # Identificar el mes de corrida en el nombre del archivo
         month_regex = re.search(r'_(\d+)-?(\d+)?\.txt', file_name)
         first_month, last_month = month_regex.group(1), month_regex.group(2)
@@ -222,7 +223,7 @@ class ReadCPTpredictor(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         # Extraer información del archivo CPT
         df_info: List[CPTpredictorFileInfo] = self.__extract_cpt_predictor_file_info(file_name)
 
@@ -294,7 +295,7 @@ class ReadEregDEToutput(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         # Identificar el mes de corrida en el nombre del archivo
         forecast_month = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)', file_name).group(0)
         forecast_month = Mpro.month_abbr_to_int(forecast_month)
@@ -303,9 +304,9 @@ class ReadEregDEToutput(ReadStrategy):
         file_variable = re.search(r'(prec|tref)', file_name).group(0)
         file_variable = 'prcp' if file_variable == 'prec' else 't2m' if file_variable == 'tref' else None
 
-        # Extraer del archivo de configuración el primer año en el archivo
-        config = ConfigFile.Instance()
-        first_year = config.find_file_config(file_name).get('first_year_in_file', DEFAULT_START_YEAR)
+        # Extraer de la configuración el primer año en el archivo
+        first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
+            if file_config is not None else DEFAULT_START_YEAR
 
         # Leer archivo de tipo npz
         with np.load(file_name) as npz:
@@ -336,7 +337,7 @@ class ReadEregPROBoutput(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         # Identificar el mes de corrida en el nombre del archivo
         forecast_month = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)', file_name).group(0)
         forecast_month = Mpro.month_abbr_to_int(forecast_month)
@@ -345,9 +346,9 @@ class ReadEregPROBoutput(ReadStrategy):
         file_variable = re.search(r'(prec|tref)', file_name).group(0)
         file_variable = 'prcp' if file_variable == 'prec' else 't2m' if file_variable == 'tref' else None
 
-        # Extraer del archivo de configuración el primer año en el archivo
-        config = ConfigFile.Instance()
-        first_year = config.find_file_config(file_name).get('first_year_in_file', DEFAULT_START_YEAR)
+        # Extraer de la configuración el primer año en el archivo
+        first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
+            if file_config is not None else DEFAULT_START_YEAR
 
         #
         kernel = Gaussian2DKernel(x_stddev=1)
@@ -407,7 +408,7 @@ class ReadCRCSASobs(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str) -> DataFrame:
+    def read_data(self, file_name: str, file_config: dict = None) -> DataFrame:
         # El archivo es un csv, así que solo se importa con pandas y listo
         final_df = pd.read_csv(file_name, sep=';')
 
