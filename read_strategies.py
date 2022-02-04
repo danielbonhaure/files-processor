@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 from typing import List
 
 from xarray import Dataset
-from pandas import DataFrame
 from datetime import datetime
 
 from helpers import CPToutputFileInfo, CPTpredictorFileInfo
