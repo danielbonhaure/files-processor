@@ -124,7 +124,7 @@ files:
       },
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
-        name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob_hindcast.txt"
+        name: "nmme_precip-prcp_chirps_Janic_2_1991-2020_2022_1_prob_hindcast.nc"
       },
     }
   - {
