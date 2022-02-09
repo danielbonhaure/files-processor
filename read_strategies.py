@@ -88,8 +88,7 @@ class ReadCPToutputDET(ReadStrategy):
 
         # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
         months_regex = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic_(\d*)-?(\d*)?_', file_name)
-        forecast_month = Mpro.month_abbr_to_int(months_regex.group(1))
-        first_target_month, last_target_month = months_regex.group(2), months_regex.group(3)
+        forecast_month, first_target_month = Mpro.month_abbr_to_int(months_regex.group(1)), int(months_regex.group(2))
 
         # Identificar la variable en el nombre del archivo
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
@@ -192,8 +191,7 @@ class ReadCPToutputPROB(ReadStrategy):
 
         # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
         months_regex = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic_(\d*)-?(\d*)?_', file_name)
-        forecast_month = Mpro.month_abbr_to_int(months_regex.group(1))
-        first_target_month, last_target_month = months_regex.group(2), months_regex.group(3)
+        forecast_month, first_target_month = Mpro.month_abbr_to_int(months_regex.group(1)), int(months_regex.group(2))
 
         # Identificar la variable en el nombre del archivo
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
