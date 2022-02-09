@@ -446,6 +446,15 @@ class ReadEREGoutputDET(ReadStrategy):
             final_ds = xr.Dataset(
                 {file_variable: (['time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
                 coords={
+                    # TODO: Preguntar a Mechi como se maneja el año. Time debe ser la fecha de inicio de la corrida,
+                    #       es decir, para un prono corrido en diciembre de 2020 para enero de 2021, time debe tener
+                    #       como año al 2020, no al 2021. CPT retorna como año en los archivos de salida, el año del
+                    #       primer mes objetivo, es decir, 2021 en el ejemplo anterior, por lo que, en el caso del
+                    #       CPT, el año en los archivos de salida no pueden usarse sin pre-procesarlos.
+                    # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
+                    #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
+                    #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
+                    #      lo que pasa con los archivos de salida del CPT, aquí sí se puede usar directamente el año.
                     'time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
                     'latitude': npz['lat'],
                     'longitude': npz['lon']
@@ -491,8 +500,8 @@ class ReadEREGoutputPROB(ReadStrategy):
             below = for_terciles[0, :, :, :]
             near = for_terciles[1, :, :, :]
             # Se calcula la probabilidad de un evento superior a la media
-            above = 1 - near  # TODO: preguntar a Mechi si esto es correcto
-            near = near - below  # TODO: preguntar a Mechi si esto es correcto
+            above = 1 - near  # TODO: Preguntar a Mechi si esto es correcto
+            near = near - below  # TODO: Preguntar a Mechi si esto es correcto
 
             # Se crea la matriz con la que se creará el dataset
             for_terciles = np.concatenate([below[:, :, :, np.newaxis], near[:, :, :, np.newaxis],
@@ -502,6 +511,15 @@ class ReadEREGoutputPROB(ReadStrategy):
             final_ds = xr.Dataset(
                 {file_variable: (['time', 'latitude', 'longitude', 'category'], for_terciles)},
                 coords={
+                    # TODO: Preguntar a Mechi como se maneja el año. Time debe ser la fecha de inicio de la corrida,
+                    #       es decir, para un prono corrido en diciembre de 2020 para enero de 2021, time debe tener
+                    #       como año al 2020, no al 2021. CPT retorna como año en los archivos de salida, el año del
+                    #       primer mes objetivo, es decir, 2021 en el ejemplo anterior, por lo que, en el caso del
+                    #       CPT, el año en los archivos de salida no pueden usarse sin pre-procesarlos.
+                    # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
+                    #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
+                    #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
+                    #      lo que pasa con los archivos de salida del CPT, aquí sí se puede usar directamente el año.
                     'time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
                     'latitude': npz['lat'],
                     'longitude': npz['lon'],
