@@ -86,9 +86,10 @@ class ReadCPToutputDET(ReadStrategy):
         # Extraer información del archivo CPT
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
-        # Identificar el mes de corrida en el nombre del archivo
-        forecast_month = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic', file_name).group(1)
-        forecast_month = Mpro.month_abbr_to_int(forecast_month)
+        # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
+        months_regex = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic_(\d*)-?(\d*)?_', file_name)
+        forecast_month = Mpro.month_abbr_to_int(months_regex.group(1))
+        first_target_month, last_target_month = months_regex.group(2), months_regex.group(3)
 
         # Identificar la variable en el nombre del archivo
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
@@ -115,7 +116,9 @@ class ReadCPToutputDET(ReadStrategy):
         for year in data_df.index.to_list():
             year_data_df = pd.DataFrame({file_variable: data_df.loc[year]})
             year_data_df = coord_data_df.join(year_data_df)
-            year_data_df.insert(2, 'time', pd.to_datetime(f'{year}-{forecast_month}-01'))
+            # OBS: time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
+            init_year = year - 1 if forecast_month > first_target_month else year
+            year_data_df.insert(2, 'time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
             final_df = pd.concat([final_df, year_data_df])
 
         # Modificar años, en caso de que sea necesario
@@ -187,9 +190,10 @@ class ReadCPToutputPROB(ReadStrategy):
         # Extraer información del archivo CPT
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
-        # Identificar el mes de corrida en el nombre del archivo
-        forecast_month = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic', file_name).group(1)
-        forecast_month = Mpro.month_abbr_to_int(forecast_month)
+        # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
+        months_regex = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic_(\d*)-?(\d*)?_', file_name)
+        forecast_month = Mpro.month_abbr_to_int(months_regex.group(1))
+        first_target_month, last_target_month = months_regex.group(2), months_regex.group(3)
 
         # Identificar la variable en el nombre del archivo
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
@@ -217,7 +221,9 @@ class ReadCPToutputPROB(ReadStrategy):
             for year in cat_data_df.index.to_list():
                 year_data_df = pd.DataFrame({file_variable: cat_data_df.loc[year]})
                 year_data_df = coord_data_df.join(year_data_df)
-                year_data_df.insert(2, 'time', pd.to_datetime(f'{year}-{forecast_month}-01'))
+                # OBS: time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
+                init_year = year - 1 if forecast_month > first_target_month else year
+                year_data_df.insert(2, 'time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
                 year_data_df.insert(3, 'category', category)
                 category_df = pd.concat([category_df, year_data_df])
             final_df = pd.concat([final_df, category_df])
