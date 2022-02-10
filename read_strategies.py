@@ -444,11 +444,11 @@ class ReadEREGoutputDET(ReadStrategy):
             final_ds = xr.Dataset(
                 {file_variable: (['time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
                 coords={
-                    # TODO: Preguntar a Mechi como se maneja el año. Time debe ser la fecha de inicio de la corrida,
-                    #       es decir, para un prono corrido en diciembre de 2020 para enero de 2021, time debe tener
-                    #       como año al 2020, no al 2021. CPT retorna como año en los archivos de salida, el año del
-                    #       primer mes objetivo, es decir, 2021 en el ejemplo anterior, por lo que, en el caso del
-                    #       CPT, el año en los archivos de salida no pueden usarse sin pre-procesarlos.
+                    # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre de
+                    #      2020 para enero de 2021, time debe tener como año al 2020, no el 2021. CPT retorna como año
+                    #      en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+                    #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
+                    #      sin pre-procesarlos.
                     # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
                     #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
                     #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
@@ -496,24 +496,24 @@ class ReadEREGoutputPROB(ReadStrategy):
 
             # Se extraen las probabilidades en el archivo npz
             below = for_terciles[0, :, :, :]
-            near = for_terciles[1, :, :, :]
+            near_as = for_terciles[1, :, :, :]  # normal + below
             # Se calcula la probabilidad de un evento superior a la media
-            above = 1 - near  # TODO: Preguntar a Mechi si esto es correcto
-            near = near - below  # TODO: Preguntar a Mechi si esto es correcto
+            above = 1 - near_as
+            normal = near_as - below
 
             # Se crea la matriz con la que se creará el dataset
-            for_terciles = np.concatenate([below[:, :, :, np.newaxis], near[:, :, :, np.newaxis],
+            for_terciles = np.concatenate([below[:, :, :, np.newaxis], normal[:, :, :, np.newaxis],
                                            above[:, :, :, np.newaxis]], axis=3)
 
             # Crear dataset con los datos
             final_ds = xr.Dataset(
                 {file_variable: (['time', 'latitude', 'longitude', 'category'], for_terciles)},
                 coords={
-                    # TODO: Preguntar a Mechi como se maneja el año. Time debe ser la fecha de inicio de la corrida,
-                    #       es decir, para un prono corrido en diciembre de 2020 para enero de 2021, time debe tener
-                    #       como año al 2020, no al 2021. CPT retorna como año en los archivos de salida, el año del
-                    #       primer mes objetivo, es decir, 2021 en el ejemplo anterior, por lo que, en el caso del
-                    #       CPT, el año en los archivos de salida no pueden usarse sin pre-procesarlos.
+                    # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre de
+                    #      2020 para enero de 2021, time debe tener como año al 2020, no el 2021. CPT retorna como año
+                    #      en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+                    #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
+                    #      sin pre-procesarlos.
                     # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
                     #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
                     #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
