@@ -261,6 +261,9 @@ class ReadCPToutputPROB(ReadStrategy):
         # Reindexar el dataframe
         final_df = final_df.set_index(['time', 'latitude', 'longitude', 'category']).sort_index()
 
+        # La salida probabilística del CPT tiene probabilidades que van de 0 a 100
+        final_df[file_variable] = final_df[file_variable] / 100
+
         # Transformar dataframe a dataset
         final_ds = final_df.to_xarray()
 
