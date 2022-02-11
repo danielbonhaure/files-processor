@@ -41,5 +41,3 @@ if __name__ == '__main__':
 
         # Convertir archivo a NetCDF
         reader.convert_file_to_netcdf(file_name, file_config=f)
-
-

@@ -41,20 +41,20 @@ class FileReader(object):
         self._read_strategy = strategy
 
     def read_file(self, file_name: str, file_config: dict = None) -> Dataset:
-        # Leer los datos en el archivo (en un dataframe)
-        final_df = self._read_strategy.read_data(file_name, file_config).to_dataframe()
+        # Leer los datos en el archivo (en un dataset, para no perder propiedades del ds)
+        final_ds = self._read_strategy.read_data(file_name, file_config)
 
         # Filtrar años, en caso de que sea necesario
         if file_config is not None and file_config.get('filter_years') is not None:
             min_year = file_config.get('filter_years').get('min_year')
             if min_year is not None:
-                final_df = final_df.loc[final_df.index.get_level_values('time').year >= min_year]
+                final_ds = final_ds.where(final_ds.time.dt.year >= min_year, drop=True)
             max_year = file_config.get('filter_years').get('max_year')
             if max_year is not None:
-                final_df = final_df.loc[final_df.index.get_level_values('time').year <= max_year]
+                final_ds = final_ds.where(final_ds.time.dt.year <= min_year, drop=True)
 
-        # Retornar el df con los datos leídos del archivo
-        return final_df.to_xarray()
+        # Retornar el ds con los datos leídos del archivo
+        return final_ds
 
     def convert_file_to_netcdf(self, file_name: str, file_config: dict = None) -> None:
         # Definir el nombre del archivo NetCDF
