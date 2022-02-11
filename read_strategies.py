@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import calendar
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -87,7 +88,7 @@ class ReadCPToutputDET(ReadStrategy):
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
         # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
-        months_regex = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic_(\d*)-?(\d*)?_', file_name)
+        months_regex = re.search(rf'({"|".join(Mpro.months_abbr[1:])})ic_(\d*)-?(\d*)?_', file_name)
         forecast_month, first_target_month = Mpro.month_abbr_to_int(months_regex.group(1)), int(months_regex.group(2))
 
         # Identificar la variable en el nombre del archivo
@@ -190,7 +191,7 @@ class ReadCPToutputPROB(ReadStrategy):
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
         # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
-        months_regex = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)ic_(\d*)-?(\d*)?_', file_name)
+        months_regex = re.search(rf'({"|".join(Mpro.months_abbr[1:])})ic_(\d*)-?(\d*)?_', file_name)
         forecast_month, first_target_month = Mpro.month_abbr_to_int(months_regex.group(1)), int(months_regex.group(2))
 
         # Identificar la variable en el nombre del archivo
@@ -426,12 +427,15 @@ class ReadEREGoutputDET(ReadStrategy):
     """
     def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
         # Identificar el mes de corrida en el nombre del archivo
-        forecast_month = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)', file_name).group(0)
+        forecast_month = re.search(rf'({"|".join(Mpro.months_abbr[1:])})', file_name).group(0)
         forecast_month = Mpro.month_abbr_to_int(forecast_month)
 
         # Identificar la variable en el nombre del archivo
         file_variable = re.search(r'(prec|tref)', file_name).group(0)
         file_variable = 'prcp' if file_variable == 'prec' else 't2m' if file_variable == 'tref' else None
+
+        # Identificar trimestre objetivo
+        season_months = re.search(rf'({"|".join(Mpro.trimesters[1:])})', file_name).group(0)
 
         # Extraer de la configuración el primer año en el archivo
         first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
@@ -461,6 +465,11 @@ class ReadEREGoutputDET(ReadStrategy):
                     'longitude': npz['lon']
                 }
             )
+
+        # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
+        for year in final_ds.time.dt.year:
+            n_days = Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+            final_ds.loc[{'time': str(year.values)}] = final_ds.sel(time=str(year.values)) * n_days
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
