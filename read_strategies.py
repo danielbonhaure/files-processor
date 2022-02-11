@@ -485,7 +485,7 @@ class ReadEREGoutputPROB(ReadStrategy):
     """
     def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
         # Identificar el mes de corrida en el nombre del archivo
-        forecast_month = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)', file_name).group(0)
+        forecast_month = re.search(rf'({"|".join(Mpro.months_abbr[1:])})', file_name).group(0)
         forecast_month = Mpro.month_abbr_to_int(forecast_month)
 
         # Identificar la variable en el nombre del archivo
