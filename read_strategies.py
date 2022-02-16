@@ -51,7 +51,7 @@ class FileReader(object):
                 final_ds = final_ds.where(final_ds.time.dt.year >= min_year, drop=True)
             max_year = file_config.get('filter_years').get('max_year')
             if max_year is not None:
-                final_ds = final_ds.where(final_ds.time.dt.year <= min_year, drop=True)
+                final_ds = final_ds.where(final_ds.time.dt.year <= max_year, drop=True)
 
         # Retornar el ds con los datos leídos del archivo
         return final_ds
