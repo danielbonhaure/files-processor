@@ -24,7 +24,7 @@ files:
       name: "nmme_precip-prcp_chirps_Mayic_6_1991-2020_2021_1.txt",
       swap_years: {
         last_hindcast_year: 2020,
-        first_forecast_year: 2022,
+        first_forecast_year: 2021,
       },
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
@@ -36,7 +36,7 @@ files:
       name: "nmme_precip-prcp_chirps_Mayic_6_1991-2020_2021_1.txt",
       swap_years: {
         last_hindcast_year: 2020,
-        first_forecast_year: 2022,
+        first_forecast_year: 2021,
       },
       filter_years: {
         min_year: 1991,
@@ -53,11 +53,11 @@ files:
       name: "nmme_precip-prcp_chirps_Mayic_6_1991-2020_2021_1.txt",
       swap_years: {
         last_hindcast_year: 2020,
-        first_forecast_year: 2022,
+        first_forecast_year: 2021,
       },
       filter_years: {
-        min_year: 2022,
-        max_year: 2022,
+        min_year: 2021,
+        max_year: 2021,
       },
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
@@ -70,7 +70,7 @@ files:
       name: "nmme_precip-prcp_chirps_Mayic_6_1991-2020_2021_1_prob.txt",
       swap_years: {
         last_hindcast_year: 2020,
-        first_forecast_year: 2022,
+        first_forecast_year: 2021,
       },
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
@@ -82,7 +82,7 @@ files:
       name: "nmme_precip-prcp_chirps_Mayic_6_1991-2020_2021_1_prob.txt",
       swap_years: {
         last_hindcast_year: 2020,
-        first_forecast_year: 2022,
+        first_forecast_year: 2021,
       },
       filter_years: {
         min_year: 1991,
@@ -99,11 +99,11 @@ files:
       name: "nmme_precip-prcp_chirps_Mayic_6_1991-2020_2021_1_prob.txt",
       swap_years: {
         last_hindcast_year: 2020,
-        first_forecast_year: 2022,
+        first_forecast_year: 2021,
       },
       filter_years: {
-        min_year: 2022,
-        max_year: 2022,
+        min_year: 2021,
+        max_year: 2021,
       },
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
