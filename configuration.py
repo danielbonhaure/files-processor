@@ -1,18 +1,16 @@
 
-from typing import Any
-
-from singleton import Singleton
 from errors import ConfigError
+
+from typing import Any
 
 import os
 import yaml
 
 
-@Singleton
 class ConfigFile:
 
-    def __init__(self):
-        self._file_name: str = 'config.yaml'
+    def __init__(self, config_file: str = 'config.yaml'):
+        self._file_name: str = config_file
         self.cpt_config: dict = self.__load_config()
 
     def __load_config(self) -> dict:
