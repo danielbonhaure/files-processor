@@ -41,20 +41,8 @@ class FileReader(object):
         self._read_strategy = strategy
 
     def read_file(self, file_name: str, file_config: dict = None) -> Dataset:
-        # Leer los datos en el archivo (en un dataset, para no perder propiedades del ds)
-        final_ds = self._read_strategy.read_data(file_name, file_config)
-
-        # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
-            if min_year is not None:
-                final_ds = final_ds.where(final_ds.time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
-            if max_year is not None:
-                final_ds = final_ds.where(final_ds.time.dt.year <= max_year, drop=True)
-
         # Retornar el ds con los datos leídos del archivo
-        return final_ds
+        return self._read_strategy.read_data(file_name, file_config)
 
     def convert_file_to_netcdf(self, file_name: str, file_config: dict = None) -> None:
         # Definir el nombre del archivo NetCDF
@@ -116,9 +104,9 @@ class ReadCPToutputDET(ReadStrategy):
         for year in data_df.index.to_list():
             year_data_df = pd.DataFrame({file_variable: data_df.loc[year]})
             year_data_df = coord_data_df.join(year_data_df)
-            # OBS: time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
+            # OBS: init_time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
             init_year = year - 1 if forecast_month > first_target_month else year
-            year_data_df.insert(2, 'time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
+            year_data_df.insert(2, 'init_time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
             final_df = pd.concat([final_df, year_data_df])
 
         # Modificar años, en caso de que sea necesario
@@ -128,29 +116,42 @@ class ReadCPToutputDET(ReadStrategy):
             last_hindcast_year = file_config.get('swap_years').get('last_hindcast_year')
             first_forecast_year = file_config.get('swap_years').get('first_forecast_year')
 
-            # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
-            years_to_swap = set([y for y in final_df['time'].dt.year if y > last_hindcast_year])
+            # OJO: El archivo que se está leyendo indica como año, el año del primer mes objetivo (y no el año de
+            # inicialización del pronóstico). Sin embargo, el NetCDF generado debe indicar el año de inicialización
+            # en la variable init_time (y no el año del primer mes objetivo).
+            # Por lo tanto, algunas veces es necesario recalcular last_hindcast_year y first_forecast_year.
+            # Esto ocurre por ejemplo para los pronósticos inicializados en diciembre y que tienen como primer mes
+            # objetivo a enero (en estos tanto last_hindcast_year como first_forecast_year están un año por delante).
+            last_hindcast_year = last_hindcast_year - (1 if forecast_month > first_target_month else 0)
+            first_forecast_year = first_forecast_year - (1 if forecast_month > first_target_month else 0)
 
-            # Se crea un dataframe con los años renombrados
-            anhos_renombrados = pd.DataFrame()
+            # Solamente es necesario renombrar los años cuando el primer año de pronóstico (first_forecast_year)
+            # es al menos dos años posterior al último año de hindcast (last_hindcast_year).
+            if first_forecast_year - last_hindcast_year >= 2:
 
-            # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
-            # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
-            for n, y in enumerate(years_to_swap):
-                # Se hace una copia profunda del año a renombrar
-                aux = final_df.loc[final_df['time'].dt.year == y].copy(deep=True)
-                # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
-                aux['time'] = aux['time'].apply(lambda x: x.replace(year=first_forecast_year+n))
-                # Se agrega el dataframe aux al df con los años renombrados
-                anhos_renombrados = pd.concat([anhos_renombrados, aux])
-                # Se asgina NA al año que ya fue renombrado
-                final_df.loc[final_df['time'].dt.year == y, file_variable] = np.nan
+                # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
+                years_to_swap = set([y for y in final_df['init_time'].dt.year if y > last_hindcast_year])
 
-            # Se reemplaza los valores con NA en final_df con los valores corregidos
-            final_df = final_df.merge(anhos_renombrados, how='outer')
+                # Se crea un dataframe con los años renombrados
+                anhos_renombrados = pd.DataFrame()
+
+                # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
+                # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
+                for n, y in enumerate(years_to_swap):
+                    # Se hace una copia profunda del año a renombrar
+                    aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
+                    # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
+                    aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
+                    # Se agrega el dataframe aux al df con los años renombrados
+                    anhos_renombrados = pd.concat([anhos_renombrados, aux])
+                    # Se asgina NA al año que ya fue renombrado
+                    final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
+
+                # Se reemplaza los valores con NA en final_df con los valores corregidos
+                final_df = final_df.merge(anhos_renombrados, how='outer')
 
         # Reindexar el dataframe
-        final_df = final_df.set_index(['time', 'latitude', 'longitude']).sort_index()
+        final_df = final_df.set_index(['init_time', 'latitude', 'longitude']).sort_index()
 
         # Transformar dataframe a dataset
         final_ds = final_df.to_xarray()
@@ -158,6 +159,17 @@ class ReadCPToutputDET(ReadStrategy):
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                min_year = min_year - (1 if forecast_month > first_target_month else 0)
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                max_year = max_year - (1 if forecast_month > first_target_month else 0)
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds
@@ -220,9 +232,9 @@ class ReadCPToutputPROB(ReadStrategy):
             for year in cat_data_df.index.to_list():
                 year_data_df = pd.DataFrame({file_variable: cat_data_df.loc[year]})
                 year_data_df = coord_data_df.join(year_data_df)
-                # OBS: time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
+                # OBS: init_time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
                 init_year = year - 1 if forecast_month > first_target_month else year
-                year_data_df.insert(2, 'time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
+                year_data_df.insert(2, 'init_time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
                 year_data_df.insert(3, 'category', category)
                 category_df = pd.concat([category_df, year_data_df])
             final_df = pd.concat([final_df, category_df])
@@ -234,33 +246,46 @@ class ReadCPToutputPROB(ReadStrategy):
             last_hindcast_year = file_config.get('swap_years').get('last_hindcast_year')
             first_forecast_year = file_config.get('swap_years').get('first_forecast_year')
 
-            # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
-            years_to_swap = set([y for y in final_df['time'].dt.year if y > last_hindcast_year])
+            # OJO: El archivo que se está leyendo indica como año, el año del primer mes objetivo (y no el año de
+            # inicialización del pronóstico). Sin embargo, el NetCDF generado debe indicar el año de inicialización
+            # en la variable init_time (y no el año del primer mes objetivo).
+            # Por lo tanto, algunas veces es necesario recalcular last_hindcast_year y first_forecast_year.
+            # Esto ocurre por ejemplo para los pronósticos inicializados en diciembre y que tienen como primer mes
+            # objetivo a enero (en estos tanto last_hindcast_year como first_forecast_year están un año por delante).
+            last_hindcast_year = last_hindcast_year - (1 if forecast_month > first_target_month else 0)
+            first_forecast_year = first_forecast_year - (1 if forecast_month > first_target_month else 0)
 
-            # Se crea un dataframe con los años renombrados
-            anhos_renombrados = pd.DataFrame()
+            # Solamente es necesario renombrar los años cuando el primer año de pronóstico (first_forecast_year)
+            # es al menos dos años posterior al último año de hindcast (last_hindcast_year).
+            if first_forecast_year - last_hindcast_year >= 2:
 
-            # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
-            # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
-            for n, y in enumerate(years_to_swap):
-                # Se hace una copia profunda del año a renombrar
-                aux = final_df.loc[final_df['time'].dt.year == y].copy(deep=True)
-                # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
-                aux['time'] = aux['time'].apply(lambda x: x.replace(year=first_forecast_year+n))
-                # Se agrega el dataframe aux al df con los años renombrados
-                anhos_renombrados = pd.concat([anhos_renombrados, aux])
-                # Se asgina NA al año que ya fue renombrado
-                final_df.loc[final_df['time'].dt.year == y, file_variable] = np.nan
+                # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
+                years_to_swap = set([y for y in final_df['init_time'].dt.year if y > last_hindcast_year])
 
-            # Se reemplaza los valores con NA en final_df con los valores corregidos
-            final_df = final_df.merge(anhos_renombrados, how='outer')
+                # Se crea un dataframe con los años renombrados
+                anhos_renombrados = pd.DataFrame()
+
+                # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
+                # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
+                for n, y in enumerate(years_to_swap):
+                    # Se hace una copia profunda del año a renombrar
+                    aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
+                    # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
+                    aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
+                    # Se agrega el dataframe aux al df con los años renombrados
+                    anhos_renombrados = pd.concat([anhos_renombrados, aux])
+                    # Se asgina NA al año que ya fue renombrado
+                    final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
+
+                # Se reemplaza los valores con NA en final_df con los valores corregidos
+                final_df = final_df.merge(anhos_renombrados, how='outer')
 
         # Definir la categoría como una categoría, entonces el ordenar toma el orden
         # declarado en lugar de ordenar la categoría por orden alfabético.
         final_df['category'] = final_df['category'].astype('category')
         final_df['category'] = final_df['category'].cat.set_categories(['below', 'normal', 'above'])
         # Reindexar el dataframe
-        final_df = final_df.set_index(['time', 'latitude', 'longitude', 'category']).sort_index()
+        final_df = final_df.set_index(['init_time', 'latitude', 'longitude', 'category']).sort_index()
 
         # La salida probabilística del CPT tiene probabilidades que van de 0 a 100
         final_df[file_variable] = final_df[file_variable] / 100
@@ -270,6 +295,17 @@ class ReadCPToutputPROB(ReadStrategy):
 
         # Agregar atributos que describan la variable
         final_ds[file_variable].attrs['units'] = '%'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                min_year = min_year - (1 if forecast_month > first_target_month else 0)
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                max_year = max_year - (1 if forecast_month > first_target_month else 0)
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds
@@ -326,11 +362,11 @@ class ReadCPTpredictand(ReadStrategy):
         for year in data_df.index.to_list():
             year_data_df = pd.DataFrame({file_variable: data_df.loc[year]})
             year_data_df = coord_data_df.join(year_data_df)
-            year_data_df.insert(2, 'time', pd.to_datetime(f'{year}-{first_month}-01'))
+            year_data_df.insert(2, 'init_time', pd.to_datetime(f'{year}-{first_month}-01'))
             final_df = pd.concat([final_df, year_data_df])
 
         # Reindexar el dataframe
-        final_df = final_df.set_index(['time', 'latitude', 'longitude']).sort_index()
+        final_df = final_df.set_index(['init_time', 'latitude', 'longitude']).sort_index()
 
         # Transformar dataframe a dataset
         final_ds = final_df.to_xarray()
@@ -338,6 +374,15 @@ class ReadCPTpredictand(ReadStrategy):
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds
@@ -363,11 +408,11 @@ class ReadCPTpredictor(ReadStrategy):
             df['latitude'] = df.index
             df = df.melt(id_vars=['latitude'], var_name='longitude', value_name=file_variable)
             df['longitude'] = df['longitude'].astype(float)
-            df.insert(0, 'time', info.start_date)
+            df.insert(0, 'init_time', info.start_date)
             final_df = pd.concat([final_df, df])
 
         # Reindexar el dataframe
-        final_df = final_df.set_index(['time', 'latitude', 'longitude']).sort_index()
+        final_df = final_df.set_index(['init_time', 'latitude', 'longitude']).sort_index()
 
         # Transformar dataframe a dataset
         final_ds = final_df.to_xarray()
@@ -375,6 +420,15 @@ class ReadCPTpredictor(ReadStrategy):
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds
@@ -449,31 +503,40 @@ class ReadEREGoutputDET(ReadStrategy):
             n_years = len(npz[data_variable])
             # Crear dataset con los datos
             final_ds = xr.Dataset(
-                {file_variable: (['time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
+                {file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
                 coords={
                     # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre de
-                    #      2020 para enero de 2021, time debe tener como año al 2020, no el 2021. CPT retorna como año
-                    #      en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+                    #      2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
+                    #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
                     #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
                     #      sin pre-procesarlos.
                     # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
                     #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
                     #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
                     #      lo que pasa con los archivos de salida del CPT, aquí sí se puede usar directamente el año.
-                    'time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
+                    'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
                     'latitude': npz['lat'],
                     'longitude': npz['lon']
                 }
             )
 
         # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
-        for year in final_ds.time.dt.year:
+        for year in final_ds.init_time.dt.year:
             n_days = Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
-            final_ds.loc[{'time': str(year.values)}] = final_ds.sel(time=str(year.values)) * n_days
+            final_ds.loc[{'init_time': str(year.values)}] = final_ds.sel(init_time=str(year.values)) * n_days
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida} anomaly'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds
@@ -503,7 +566,7 @@ class ReadEREGoutputPROB(ReadStrategy):
             # Identificar la cantidad de años en el archivo
             n_years = len(npz[data_variable][0])
 
-            # Nombre de dimensiones: ['category', 'time', 'latitude', 'longitude']
+            # Nombre de dimensiones: ['category', 'init_time', 'latitude', 'longitude']
             for_terciles = np.squeeze(npz[data_variable][:, :, :, :])
 
             # Se extraen las probabilidades en el archivo npz
@@ -519,18 +582,18 @@ class ReadEREGoutputPROB(ReadStrategy):
 
             # Crear dataset con los datos
             final_ds = xr.Dataset(
-                {file_variable: (['time', 'latitude', 'longitude', 'category'], for_terciles)},
+                {file_variable: (['init_time', 'latitude', 'longitude', 'category'], for_terciles)},
                 coords={
                     # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre de
-                    #      2020 para enero de 2021, time debe tener como año al 2020, no el 2021. CPT retorna como año
-                    #      en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+                    #      2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
+                    #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
                     #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
                     #      sin pre-procesarlos.
                     # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
                     #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
                     #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
                     #      lo que pasa con los archivos de salida del CPT, aquí sí se puede usar directamente el año.
-                    'time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
+                    'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
                     'latitude': npz['lat'],
                     'longitude': npz['lon'],
                     'category': ['below', 'normal', 'above']
@@ -539,6 +602,15 @@ class ReadEREGoutputPROB(ReadStrategy):
 
         # Agregar atributos que describan la variable
         final_ds[file_variable].attrs['units'] = '%'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds
@@ -565,6 +637,15 @@ class ReadCRCSASobs(ReadStrategy):
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
+
+        # Filtrar años, en caso de que sea necesario
+        if file_config is not None and file_config.get('filter_years') is not None:
+            min_year = file_config.get('filter_years').get('min_year')
+            if min_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = file_config.get('filter_years').get('max_year')
+            if max_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
         # Return generated dataset
         return final_ds

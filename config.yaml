@@ -103,7 +103,7 @@ files:
       path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
       name: "nmme_precip-prcp_chirps_Decic_1_1992-2021_2022_1.txt",
       swap_years: {
-        last_hindcast_year: 2020,
+        last_hindcast_year: 2021,
         first_forecast_year: 2022,
       },
       output_file: {
@@ -115,12 +115,12 @@ files:
       path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
       name: "nmme_precip-prcp_chirps_Decic_1_1992-2021_2022_1.txt",
       swap_years: {
-        last_hindcast_year: 2020,
+        last_hindcast_year: 2021,
         first_forecast_year: 2022,
       },
       filter_years: {
-        min_year: 1991,
-        max_year: 2020,
+        min_year: 1992,
+        max_year: 2021,
       },
       output_file: {
         path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/RStudioProjects/ValidacionPronosticosCalibrados/test_data/",
@@ -132,7 +132,7 @@ files:
       path: "/media/dbonhaure/c78fd429-66af-414f-82ff-284ddfafc1e2/PycharmProjects/RunCPT/output/",
       name: "nmme_precip-prcp_chirps_Decic_1_1992-2021_2022_1.txt",
       swap_years: {
-        last_hindcast_year: 2020,
+        last_hindcast_year: 2021,
         first_forecast_year: 2022,
       },
       filter_years: {
