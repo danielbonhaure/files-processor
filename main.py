@@ -65,6 +65,8 @@ if __name__ == '__main__':
 
     # Obtener listado de archivos de configuración
     config_files = sorted(os.listdir(args.config_folder))
+    config_files = [f for f in config_files if f.endswith('.yaml')]
+    config_files = [f for f in config_files if "template" not in f]
 
     # Procesar cada uno de los archivos de configuración
     for nn, cf in enumerate(config_files):
