@@ -495,30 +495,54 @@ class ReadEREGoutputDET(ReadStrategy):
         first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
             if file_config is not None else DEFAULT_START_YEAR
 
+        # Determinar si el archivo es de tipo hindcast o no
+        is_hindcast = ('_hind.npz' in file_name)
+
         # Leer archivo de tipo npz
         with np.load(file_name) as npz:
             # Identificar variable con datos
             data_variable = [x for x in npz.files if x not in ['lat', 'lon']][0]
-            # Identificar la cantidad de años en el archivo
-            n_years = len(npz[data_variable])
-            # Crear dataset con los datos
-            final_ds = xr.Dataset(
-                {file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
-                coords={
-                    # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre de
-                    #      2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
-                    #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
-                    #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
-                    #      sin pre-procesarlos.
-                    # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
-                    #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
-                    #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
-                    #      lo que pasa con los archivos de salida del CPT, aquí sí se puede usar directamente el año.
-                    'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
-                    'latitude': npz['lat'],
-                    'longitude': npz['lon']
-                }
-            )
+            # Los archivos de tipo hindcast y real_time tiene diferentes estructuras. Por lo tanto se los lee de manera
+            # diferente. Los hindcasts tienen datos para muchos años, los real_time tienen un solo año.
+            if is_hindcast:
+                # Identificar la cantidad de años en el archivo
+                n_years = len(npz[data_variable])
+                # Crear dataset con los datos
+                final_ds = xr.Dataset(
+                    {file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
+                    coords={
+                        # "init_time" debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en
+                        #      diciembre de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021.
+                        #      CPT retorna como año en los archivos de salida, el año del primer mes objetivo, es decir,
+                        #      2021 en el ejemplo anterior, por lo que, en el caso del CPT, el año en los archivos de
+                        #      salida no pueden usarse sin pre-procesarlos.
+                        # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast
+                        #      al primer año en el archivo, entonces se asume que este año es siempre el año de inicio
+                        #      de la corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a
+                        #      diferencia de lo que pasa con los archivos de salida del CPT, aquí sí se puede usar
+                        #      directamente el año.
+                        'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
+                        'latitude': npz['lat'],
+                        'longitude': npz['lon']
+                    })
+            else:
+                # Crear dataset con los datos
+                final_ds = xr.Dataset(
+                    {file_variable: (['latitude', 'longitude'], np.squeeze(npz[data_variable][:, :]))},
+                    coords={
+                        'latitude': npz['lat'],
+                        'longitude': npz['lon']
+                    })
+                # Identificar el año de pronósticos real_time
+                forecast_year = re.search(rf'(?:{"|".join(Mpro.months_abbr[1:])})(\d{{4}})', file_name).group(1)
+                # Agregar init_time al dataset
+                # "init_time" debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre
+                #      de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
+                #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+                #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
+                #      sin pre-procesarlos.
+                final_ds = final_ds.expand_dims(
+                    init_time=pd.date_range(f"{forecast_year}-{forecast_month}-01", periods=1)).copy(deep=True)
 
         # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
         for year in final_ds.init_time.dt.year:
@@ -559,46 +583,89 @@ class ReadEREGoutputPROB(ReadStrategy):
         first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
             if file_config is not None else DEFAULT_START_YEAR
 
+        # Determinar si el archivo es de tipo hindcast o no
+        is_hindcast = ('_hind.npz' in file_name)
+
         # Leer archivo de tipo npz
         with np.load(file_name) as npz:
             # Identificar variable con datos
             data_variable = [x for x in npz.files if x not in ['lat', 'lon']][0]
-            # Identificar la cantidad de años en el archivo
-            n_years = len(npz[data_variable][0])
 
-            # Nombre de dimensiones: ['category', 'init_time', 'latitude', 'longitude']
-            for_terciles = np.squeeze(npz[data_variable][:, :, :, :])
+            # Los archivos de tipo hindcast y real_time tiene diferentes estructuras. Por lo tanto se los lee de manera
+            # diferente. Los hindcasts tienen datos para muchos años, los real_time tienen un solo año.
+            if is_hindcast:
 
-            # Se extraen las probabilidades en el archivo npz
-            below = for_terciles[0, :, :, :]
-            near_as = for_terciles[1, :, :, :]  # normal + below
-            # Se calcula la probabilidad de un evento superior a la media
-            above = 1 - near_as
-            normal = near_as - below
+                # Identificar la cantidad de años en el archivo
+                n_years = len(npz[data_variable][0])
 
-            # Se crea la matriz con la que se creará el dataset
-            for_terciles = np.concatenate([below[:, :, :, np.newaxis], normal[:, :, :, np.newaxis],
-                                           above[:, :, :, np.newaxis]], axis=3)
+                # Nombre de dimensiones: ['category', 'init_time', 'latitude', 'longitude']
+                for_terciles = np.squeeze(npz[data_variable][:, :, :, :])
 
-            # Crear dataset con los datos
-            final_ds = xr.Dataset(
-                {file_variable: (['init_time', 'latitude', 'longitude', 'category'], for_terciles)},
-                coords={
-                    # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre de
-                    #      2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
-                    #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
-                    #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
-                    #      sin pre-procesarlos.
-                    # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast al
-                    #      primer año en el archivo, entonces se asume que este año es siempre el año de inicio de la
-                    #      corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a diferencia de
-                    #      lo que pasa con los archivos de salida del CPT, aquí sí se puede usar directamente el año.
-                    'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
-                    'latitude': npz['lat'],
-                    'longitude': npz['lon'],
-                    'category': ['below', 'normal', 'above']
-                }
-            )
+                # Se extraen las probabilidades en el archivo npz
+                below = for_terciles[0, :, :, :]
+                near_as = for_terciles[1, :, :, :]  # normal + below
+                # Se calcula la probabilidad de un evento superior a la media
+                above = 1 - near_as
+                normal = near_as - below
+
+                # Se crea la matriz con la que se creará el dataset
+                for_terciles = np.concatenate([below[:, :, :, np.newaxis], normal[:, :, :, np.newaxis],
+                                               above[:, :, :, np.newaxis]], axis=3)
+
+                # Crear dataset con los datos
+                final_ds = xr.Dataset(
+                    {file_variable: (['init_time', 'latitude', 'longitude', 'category'], for_terciles)},
+                    coords={
+                        # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre
+                        #      de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT
+                        #      retorna como año en los archivos de salida, el año del primer mes objetivo, es decir,
+                        #      2021 en el ejemplo anterior, por lo que, en el caso del CPT, el año en los archivos de
+                        #      salida no pueden usarse sin pre-procesarlos.
+                        # OBS: como el archivo de salida no tiene años y siempre se asigna el primer año del hindcast
+                        #      al primer año en el archivo, entonces se asume que este año es siempre el año de inicio
+                        #      de la corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a
+                        #      diferencia de lo que pasa con los archivos de salida del CPT, aquí sí se puede usar
+                        #      directamente el año.
+                        'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
+                        'latitude': npz['lat'],
+                        'longitude': npz['lon'],
+                        'category': ['below', 'normal', 'above']
+                    })
+
+            else:
+
+                # Nombre de dimensiones: ['category', 'latitude', 'longitude']
+                for_terciles = np.squeeze(npz[data_variable][:, :, :])
+
+                # Se extraen las probabilidades en el archivo npz
+                below = for_terciles[0, :, :]
+                near_as = for_terciles[1, :, :]  # normal + below
+                # Se calcula la probabilidad de un evento superior a la media
+                above = 1 - near_as
+                normal = near_as - below
+
+                # Se crea la matriz con la que se creará el dataset
+                for_terciles = np.concatenate([below[:, :, np.newaxis], normal[:, :, np.newaxis],
+                                               above[:, :, np.newaxis]], axis=2)
+
+                # Crear dataset con los datos
+                final_ds = xr.Dataset(
+                    {file_variable: (['latitude', 'longitude', 'category'], for_terciles)},
+                    coords={
+                        'latitude': npz['lat'],
+                        'longitude': npz['lon'],
+                        'category': ['below', 'normal', 'above']
+                    })
+                # Identificar el año de pronósticos real_time
+                forecast_year = re.search(rf'(?:{"|".join(Mpro.months_abbr[1:])})(\d{{4}})', file_name).group(1)
+                # Agregar init_time al dataset
+                # "init_time" debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre
+                #      de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
+                #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+                #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
+                #      sin pre-procesarlos.
+                final_ds = final_ds.expand_dims(
+                    init_time=pd.date_range(f"{forecast_year}-{forecast_month}-01", periods=1)).copy(deep=True)
 
         # Agregar atributos que describan la variable
         final_ds[file_variable].attrs['units'] = '%'
