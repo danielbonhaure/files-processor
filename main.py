@@ -1,13 +1,18 @@
 #!/usr/bin/env python
 
+import os
+import logging
+
+# Change current directory
+if os.path.dirname(__file__):
+    os.chdir(os.path.dirname(__file__))
+
 from errors import DescriptorError
 from configuration import ConfigFile, DescriptorFile
 from read_strategies import FileReader
-from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, \
-    ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor, \
-    ReadCRCSASobs
-
-import os
+from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB
+from read_strategies import ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor
+from read_strategies import ReadCRCSASobs
 
 
 def define_read_strategy(file_type: str, descriptor_filename: str):
@@ -31,7 +36,14 @@ def define_read_strategy(file_type: str, descriptor_filename: str):
 
 
 if __name__ == '__main__':
+    # Conf logging
+    logging.basicConfig(format='%(asctime)s -- %(message)s', datefmt='%Y/%m/%d %I:%M:%S %p', level=logging.INFO)
 
+    # Reportar inicio de la ejecución
+    logging.info('')
+    logging.info('THE START')
+
+    # Read processor config file
     config = ConfigFile.Instance()
     desc_files_folder = config.get('folders').get('descriptor_files')
 
@@ -40,6 +52,7 @@ if __name__ == '__main__':
     desc_files = [f for f in desc_files if f.endswith('.yaml') and f != 'template.yaml']
 
     # Procesar cada uno de los archivos de configuración
+    files_count = 0
     for dn, df in enumerate(desc_files):
 
         # Leer el archivo de configuración
@@ -55,6 +68,9 @@ if __name__ == '__main__':
         if len(proc_files) == 0:
             continue
 
+        # Agregar una línea para separar la salida del log
+        logging.info('')
+
         # Convertir los archivos indicados en el archivo de configuración
         for pn, pf in enumerate(proc_files):
 
@@ -68,10 +84,17 @@ if __name__ == '__main__':
             reader.convert_file_to_netcdf(desc_file=pf)
 
             # Informar avance
-            print(f'\r F: {pn+1}/{len(proc_files)} -- ({df})', end='')
+            logging.info(f'Processed files: {pn+1}/{len(proc_files)} -- ({df})')
 
-        # Suprimir retorno de carro
-        print('')
+            # Contar archivo
+            files_count += 1
 
-    if len(desc_files) == 0:
-        print(' F: 0/0 -- ()')
+    # En caso de que no se haya procesado ningún archivo, se informa lo siguiente
+    if len(desc_files) == 0 or files_count == 0:
+        logging.info('')
+        logging.info('Processed files: 0/0 -- ()')
+
+    # Reportar final de la ejecución
+    logging.info('')
+    logging.info('THE END')
+    logging.info('')
