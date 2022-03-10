@@ -5,5 +5,11 @@ class Error(Exception):
 
 
 class ConfigError(Error):
-    """Raised when the a configuration value is wrong"""
+    """Raised when a configuration value is wrong"""
     pass
+
+
+class DescriptorError(Error):
+    """Raised when a descriptor value is wrong"""
+    pass
+

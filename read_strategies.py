@@ -1,7 +1,8 @@
 
 from __future__ import annotations
 
-import calendar
+from configuration import ConfigFile
+
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -12,10 +13,11 @@ from helpers import CPToutputFileInfo, CPTpredictorFileInfo
 from helpers import MonthsProcessor as Mpro
 
 import re
-import os.path
+import os
 import pandas as pd
 import numpy as np
 import xarray as xr
+import calendar
 
 
 """ 
@@ -40,22 +42,65 @@ class FileReader(object):
     def read_strategy(self, strategy: ReadStrategy) -> None:
         self._read_strategy = strategy
 
-    def read_file(self, file_name: str, file_config: dict = None) -> Dataset:
+    @classmethod
+    def define_input_filename(cls, desc_file: dict):
+        # Definir nombre del archivo a leer
+        input_filename = os.path.join(desc_file.get('path'), desc_file.get('name'))
+        # Si el path no es absoluto, anteponer la carpeta con los descriptores
+        if not os.path.isabs(input_filename):
+            input_filename = os.path.join(ConfigFile.Instance().get('folders').get('descriptor_files'), input_filename)
+        # Retornar el nombre del archivo a leer
+        return input_filename
+
+    @classmethod
+    def define_output_filename(cls, desc_file: dict = None) -> str:
+        # Definir nombre del archivo a leer
+        input_filename = cls.define_input_filename(desc_file)
+        # Definir el nombre del archivo NetCDF (para los casos en los que no se defina output_file)
+        output_filename = f"{os.path.splitext(input_filename)[0]}.nc"
+        # Definir el nombre del archivo NetCDF (para los casos en los que sí se defina output_file)
+        if desc_file is not None and desc_file.get('output_file') is not None:
+            # Obtener la carpeta de destino
+            output_path = desc_file.get('output_file').get('path', os.path.dirname(output_filename))
+            # Si lo que se obtiene no es un path absoluto,  anteponer la carpeta con los descriptores
+            if not os.path.isabs(output_path):
+                output_path = os.path.join(ConfigFile.Instance().get('folders').get('descriptor_files'), output_path)
+            # Obtener el nombre del archivo de destino (sin carpeta, solo el nombre del archivo)
+            output_file = desc_file.get('output_file').get('name', os.path.basename(output_filename))
+            # Definir el path absoluto para el archivo de destino
+            output_filename = os.path.join(output_path, output_file)
+        # Retornar el nombre definido
+        return output_filename
+
+    @classmethod
+    def output_file_must_be_created(cls, desc_file: dict = None) -> bool:
+        # Leer configuración del script
+        config = ConfigFile.Instance()
+        # Si el archivo de salida no existe, debe ser creado
+        if not os.path.exists(cls.define_output_filename(desc_file)):
+            return True
+        # Si la configuración del script indica que todos los archivos de salida deben ser creados, debe ser creado
+        if config.get('force_output_update', False) is True:
+            return True
+        # Si el descriptor indica que el archivo de salida debe ser creado, deber ser creado
+        if desc_file.get('update_output', False) is True:
+            return True
+        # En cualquier otro caso, el archivo de salida no debe ser creado
+        return False
+
+    def read_file(self, desc_file: dict = None) -> Dataset:
+        # Definir nombre del archivo a leer
+        input_filename = self.define_input_filename(desc_file)
         # Retornar el ds con los datos leídos del archivo
-        return self._read_strategy.read_data(file_name, file_config)
+        return self._read_strategy.read_data(input_filename, desc_file)
 
-    def convert_file_to_netcdf(self, file_name: str, file_config: dict = None) -> None:
-        # Definir el nombre del archivo NetCDF
-        output_file_name = f"{os.path.splitext(file_name)[0]}.nc"
-        if file_config is not None and file_config.get('output_file') is not None:
-            output_path = file_config.get('output_file').get('path', os.path.dirname(output_file_name))
-            output_file = file_config.get('output_file').get('name', os.path.basename(output_file_name))
-            output_file_name = os.path.join(output_path, output_file)
-
-        # Convertir pandas dataframe a xarray dataset
-        with self.read_file(file_name, file_config) as ds:
-            # Guardar el dataset en un NetCDF
-            ds.to_netcdf(output_file_name)
+    def convert_file_to_netcdf(self, desc_file: dict = None) -> None:
+        # Convertir archivo solo si el archivo de salida debe ser creado
+        if self.output_file_must_be_created(desc_file):
+            # Leer el archivo en un Dataset
+            with self.read_file(desc_file) as ds:
+                # Guardar el dataset en un NetCDF
+                ds.to_netcdf(self.define_output_filename(desc_file))
 
 
 class ReadStrategy(ABC):
@@ -63,7 +108,7 @@ class ReadStrategy(ABC):
     The Strategy Interface (Desing Pattern -> Strategy)
     """
     @abstractmethod
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         pass
 
 
@@ -71,7 +116,7 @@ class ReadCPToutputDET(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         # Extraer información del archivo CPT
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
@@ -110,11 +155,11 @@ class ReadCPToutputDET(ReadStrategy):
             final_df = pd.concat([final_df, year_data_df])
 
         # Modificar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('swap_years') is not None:
+        if desc_file is not None and desc_file.get('swap_years') is not None:
 
             # Obtener último año de hindcast y primer año pronosticado
-            last_hindcast_year = file_config.get('swap_years').get('last_hindcast_year')
-            first_forecast_year = file_config.get('swap_years').get('first_forecast_year')
+            last_hindcast_year = desc_file.get('swap_years').get('last_hindcast_year')
+            first_forecast_year = desc_file.get('swap_years').get('first_forecast_year')
 
             # OJO: El archivo que se está leyendo indica como año, el año del primer mes objetivo (y no el año de
             # inicialización del pronóstico). Sin embargo, el NetCDF generado debe indicar el año de inicialización
@@ -161,12 +206,12 @@ class ReadCPToutputDET(ReadStrategy):
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 min_year = min_year - (1 if forecast_month > first_target_month else 0)
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 max_year = max_year - (1 if forecast_month > first_target_month else 0)
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
@@ -198,7 +243,7 @@ class ReadCPToutputPROB(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         # Extraer información del archivo CPT
         info: CPToutputFileInfo = self.__extract_cpt_output_file_info(file_name)
 
@@ -240,11 +285,11 @@ class ReadCPToutputPROB(ReadStrategy):
             final_df = pd.concat([final_df, category_df])
 
         # Modificar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('swap_years') is not None:
+        if desc_file is not None and desc_file.get('swap_years') is not None:
 
             # Obtener último año de hindcast y primer año pronosticado
-            last_hindcast_year = file_config.get('swap_years').get('last_hindcast_year')
-            first_forecast_year = file_config.get('swap_years').get('first_forecast_year')
+            last_hindcast_year = desc_file.get('swap_years').get('last_hindcast_year')
+            first_forecast_year = desc_file.get('swap_years').get('first_forecast_year')
 
             # OJO: El archivo que se está leyendo indica como año, el año del primer mes objetivo (y no el año de
             # inicialización del pronóstico). Sin embargo, el NetCDF generado debe indicar el año de inicialización
@@ -297,12 +342,12 @@ class ReadCPToutputPROB(ReadStrategy):
         final_ds[file_variable].attrs['units'] = '%'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 min_year = min_year - (1 if forecast_month > first_target_month else 0)
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 max_year = max_year - (1 if forecast_month > first_target_month else 0)
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
@@ -334,7 +379,7 @@ class ReadCPTpredictand(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         # Identificar el mes de corrida en el nombre del archivo
         month_regex = re.search(r'_(\d+)-?(\d+)?\.txt', file_name)
         first_month, last_month = month_regex.group(1), month_regex.group(2)
@@ -376,11 +421,11 @@ class ReadCPTpredictand(ReadStrategy):
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
@@ -392,7 +437,7 @@ class ReadCPTpredictor(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         # Extraer información del archivo CPT
         df_info: List[CPTpredictorFileInfo] = self.__extract_cpt_predictor_file_info(file_name)
 
@@ -422,11 +467,11 @@ class ReadCPTpredictor(ReadStrategy):
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
@@ -479,7 +524,7 @@ class ReadEREGoutputDET(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         # Identificar el mes de corrida en el nombre del archivo
         forecast_month = re.search(rf'({"|".join(Mpro.months_abbr[1:])})', file_name).group(0)
         forecast_month = Mpro.month_abbr_to_int(forecast_month)
@@ -492,8 +537,8 @@ class ReadEREGoutputDET(ReadStrategy):
         season_months = re.search(rf'({"|".join(Mpro.trimesters[1:])})', file_name).group(0)
 
         # Extraer de la configuración el primer año en el archivo
-        first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
-            if file_config is not None else DEFAULT_START_YEAR
+        first_year = desc_file.get('first_year_in_file', DEFAULT_START_YEAR) \
+            if desc_file is not None else DEFAULT_START_YEAR
 
         # Determinar si el archivo es de tipo hindcast o no
         is_hindcast = ('_hind.npz' in file_name)
@@ -554,11 +599,11 @@ class ReadEREGoutputDET(ReadStrategy):
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida} anomaly'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
@@ -570,7 +615,7 @@ class ReadEREGoutputPROB(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
         # Identificar el mes de corrida en el nombre del archivo
         forecast_month = re.search(rf'({"|".join(Mpro.months_abbr[1:])})', file_name).group(0)
         forecast_month = Mpro.month_abbr_to_int(forecast_month)
@@ -580,8 +625,8 @@ class ReadEREGoutputPROB(ReadStrategy):
         file_variable = 'prcp' if file_variable == 'prec' else 't2m' if file_variable == 'tref' else None
 
         # Extraer de la configuración el primer año en el archivo
-        first_year = file_config.get('first_year_in_file', DEFAULT_START_YEAR) \
-            if file_config is not None else DEFAULT_START_YEAR
+        first_year = desc_file.get('first_year_in_file', DEFAULT_START_YEAR) \
+            if desc_file is not None else DEFAULT_START_YEAR
 
         # Determinar si el archivo es de tipo hindcast o no
         is_hindcast = ('_hind.npz' in file_name)
@@ -671,11 +716,11 @@ class ReadEREGoutputPROB(ReadStrategy):
         final_ds[file_variable].attrs['units'] = '%'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 
@@ -687,7 +732,7 @@ class ReadCRCSASobs(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)
     """
-    def read_data(self, file_name: str, file_config: dict = None) -> Dataset:
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
 
         # Identificar la variable en el nombre del archivo
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
@@ -706,11 +751,11 @@ class ReadCRCSASobs(ReadStrategy):
         final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
 
         # Filtrar años, en caso de que sea necesario
-        if file_config is not None and file_config.get('filter_years') is not None:
-            min_year = file_config.get('filter_years').get('min_year')
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
             if min_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
-            max_year = file_config.get('filter_years').get('max_year')
+            max_year = desc_file.get('filter_years').get('max_year')
             if max_year is not None:
                 final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
 

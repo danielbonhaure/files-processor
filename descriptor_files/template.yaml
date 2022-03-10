@@ -1,0 +1,40 @@
+
+# AYUDA:
+# Cada archivo puede contar con los siguientes entradas opcionales:
+#      first_year_in_file: <a-year>,  # es necesario solo cuando el archivo a procesar no tiene años (Ej: metodología Climax-Osman)
+#      swap_years: {  # puede no estar, si no está se toman los años en el archivo de entrada sin cambios
+#        last_hindcast_year: <year>,  # es obligatorio si usa la opción swap_year
+#        first_forecast_year: <year>,  # es obligatorio si usa la opción swap_year
+#      },
+#      filter_years: {  # puede no estar, si no está no se excluye ningún año extraído
+#        min_year: <year>,  # puede no estar (aunque sí esté max_year)
+#        max_year: <year>,  # puede no estar (aunque sí esté min_year)
+#      },
+#      output_file: {  # puede no estar, si no está se usan path y name del archivo de entrada (se modifica la extensión a .nc)
+#        path: <new_path>,  # puede no estar (aunque sí esté name), si no está se toma el path del archivo de entrada
+#        name: <new_name>,  # puede no estar (aunque sí esté path), si no está se toma el name del archivo de entrada (se modifica la extensión a .nc)
+#      },
+#      update_output: True,  # en caso que se quiera volver a procesar un archivo
+# Tener en cuenta que, para la validación correcta de VARIOS FORECAST, el validador va a leer y combinar varios archivos
+# con pronósticos calibrados, por lo tanto, es necesario que cada archivo NetCDF de este tipo tenga un solo año o que un
+# mismo año nunca aparezca en más de uno de los archivos NetCDF a ser combinados(porque de otro modo, al combinar los
+# datos en los archivos, aparecerán IDs duplicados - un ID es la combinación lon, lat, año)
+
+files:
+  - {
+    type: "<type>",
+    path: "<file-path>",
+    name: "<file-name>",
+    first_year_in_file: <a-year>,
+    swap_years: {
+      last_hindcast_year: <a-year>,
+      first_forecast_year: <a-year>,
+    },
+    filter_years: {
+      min_year: <a-year>,
+      max_year: <a-year>,
+    },
+    output_file: {
+      path: "<path>",
+    },
+  }

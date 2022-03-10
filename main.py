@@ -1,45 +1,16 @@
 #!/usr/bin/env python
 
-from configuration import ConfigFile, ConfigError
+from errors import DescriptorError
+from configuration import ConfigFile, DescriptorFile
 from read_strategies import FileReader
 from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, \
     ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor, \
     ReadCRCSASobs
 
-import os.path
-import argparse
-import shutil
+import os
 
 
-def parse_arguments():
-    # Definir argumentos
-    parser = argparse.ArgumentParser(description='Files processor')
-    #
-    parser.add_argument('-f', '--config_folder', type=str, nargs=1, default='config_files',
-                        help='folder that contains the configuration files to be processed.')
-    parser.add_argument('-a', '--archive_folder', type=str, nargs=1, default='config_files_archive',
-                        help='folder that contains the configuration files already processed.')
-
-    # Retornan argumentos parseados
-    return parser.parse_args()
-
-
-def archive_config_file(config_file, src_folder, dst_folder):
-    # Contar cuantos archivos con el mismo nombre hay en la carpeta destino
-    n_dst_files = sum(1 for dst_f in os.listdir(args.archive_folder) if dst_f == config_file)
-
-    # Definir el nombre final del archivo
-    final_config_file = config_file
-
-    # Modificar el nombre del archivo en caso de que sea necesario
-    if n_dst_files:
-        final_config_file = f"{os.path.splitext(config_file)[0]}_{str(n_dst_files + 1)}.yaml"
-
-    # Mover el archivo
-    shutil.move(f'{src_folder}/{config_file}', f'{dst_folder}/{final_config_file}')
-
-
-def define_read_strategy(file_type):
+def define_read_strategy(file_type: str, descriptor_filename: str):
     if file_type == 'ereg_det_output':
         return ReadEREGoutputDET()
     elif file_type == 'ereg_prob_output':
@@ -55,51 +26,52 @@ def define_read_strategy(file_type):
     elif file_type == 'cpt_predictor':
         return ReadCPTpredictor()
     else:
-        raise ConfigError('El tipo de archivo indicado es incorrecto')
+        raise DescriptorError(f'El tipo de archivo indicado "{file_type}" es incorrecto. '
+                              f'Verifique el descriptor: {descriptor_filename}.')
 
 
 if __name__ == '__main__':
 
-    # Parsear argumentos
-    args = parse_arguments()
+    config = ConfigFile.Instance()
+    desc_files_folder = config.get('folders').get('descriptor_files')
 
     # Obtener listado de archivos de configuración
-    config_files = sorted(os.listdir(args.config_folder))
-    config_files = [f for f in config_files if f.endswith('.yaml')]
-    config_files = [f for f in config_files if "template" not in f]
+    desc_files = sorted(os.listdir(desc_files_folder))
+    desc_files = [f for f in desc_files if f.endswith('.yaml') and f != 'template.yaml']
 
     # Procesar cada uno de los archivos de configuración
-    for nn, cf in enumerate(config_files):
+    for dn, df in enumerate(desc_files):
 
         # Leer el archivo de configuración
-        config = ConfigFile(config_file=f'{args.config_folder}/{cf}')
+        descriptor = DescriptorFile(f'{desc_files_folder}/{df}')
 
         # Obtener listado de archivos a transformar
-        files = config.get('files')
+        proc_files = descriptor.get('files')
+
+        # Descartar archivos que no deben ser creados
+        proc_files = [f for f in proc_files if FileReader.output_file_must_be_created(f)]
+
+        # Si no hay archivos por procesar, continuar con el siguiente descriptor
+        if len(proc_files) == 0:
+            continue
 
         # Convertir los archivos indicados en el archivo de configuración
-        for n, f in enumerate(files):
+        for pn, pf in enumerate(proc_files):
 
             # Definir estrategia de lectura del archivo
-            read_strategy = define_read_strategy(f.get('type'))
+            read_strategy = define_read_strategy(pf.get('type'), df)
 
             # Definir el objeto encargado de leer y convertir el archivo
             reader = FileReader(read_strategy)
 
-            # Definir nombre del archivo a leer
-            file_name = os.path.join(f.get('path'), f.get('name'))
-
             # Convertir archivo a NetCDF
-            reader.convert_file_to_netcdf(file_name, file_config=f)
+            reader.convert_file_to_netcdf(desc_file=pf)
 
             # Informar avance
-            print(f'\r CF: {nn+1}/{len(config_files)} -- F: {n+1}/{len(files)} -- ({cf})', end='')
-
-        # Mover el archivo de configuración procesado al archivo
-        archive_config_file(cf, args.config_folder, args.archive_folder)
+            print(f'\r F: {pn+1}/{len(proc_files)} -- ({df})', end='')
 
         # Suprimir retorno de carro
         print('')
 
-    if len(config_files) == 0:
-        print(' CF: 0/0 -- F: 0/0')
+    if len(desc_files) == 0:
+        print(' F: 0/0 -- ()')
