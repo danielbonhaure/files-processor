@@ -95,7 +95,7 @@ USER root
 # Modify root password
 RUN echo "root:$ROOT_PWD" | chpasswd
 
-# Create a new user, so the container can run as non-root
+# Create a non-root user, so the container can run as non-root
 # OBS: the UID and GID must be the same as the user that own the
 # input and the output volumes, so there isn't perms problems!!
 ARG NON_ROOT_USR="nonroot"
@@ -104,10 +104,10 @@ ARG NON_ROOT_GID="1000"
 RUN groupadd --gid $NON_ROOT_GID $NON_ROOT_USR
 RUN useradd --uid $NON_ROOT_UID --gid $NON_ROOT_GID --comment "Non-root User Account" --create-home $NON_ROOT_USR
 
-# Modify the password of the new user
+# Modify the password of non-root user
 RUN echo "$NON_ROOT_USR:$NON_ROOT_PWD" | chpasswd
 
-# Add new user to sudoers
+# Add non-root user to sudoers
 RUN adduser $NON_ROOT_USR sudo
 
 # Setup files processor
@@ -123,10 +123,10 @@ ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
 CMD ["cron", "-f"]
 # or docker run your-image /your/program ...
 
-# Access user directory
+# Access non-root user directory
 WORKDIR /home/$NON_ROOT_USR
 
-# Switch back to cpt_user to avoid accidental container runs as root
+# Switch back to non-root user to avoid accidental container runs as root
 USER $NON_ROOT_USR
 
 # CONSTRUIR CONTENEDOR
