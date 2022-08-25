@@ -490,8 +490,8 @@ class ReadCPTpredictor(ReadStrategy):
             for cnt, line in enumerate(fp):
 
                 # Aplicar expresiones regulares a la línea actual
-                start_date_regex = re.search(r'cpt:S=(\d+)-(\d+)-(\d+),', line)
-                target_date_regex = re.search(r'cpt:T=(\d+)-(\d+)/?(\d+)?-?(\d+)?,', line)
+                start_date_regex = re.search(r'cpt:S=(\d+)-(\d+)-(\d+)(T00:00)?,', line)
+                target_date_regex = re.search(r'cpt:T=(\d+)-(\d+)/?(\d+)?-?(\d+)?,?', line)
                 n_rows_regex, n_cols_regex = re.search(r'cpt:nrow=(\d+),', line), re.search(r'cpt:ncol=(\d+),', line)
                 na_values_regex = re.search(r'cpt:missing=([-+]?\d+\.?\d+?)', line)
 
