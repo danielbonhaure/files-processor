@@ -10,6 +10,7 @@ from typing import List
 
 from xarray import Dataset
 from datetime import datetime
+from pathlib import Path
 
 import re
 import os
@@ -30,8 +31,9 @@ class FileReader(object):
     The Context (Desing Pattern -> Strategy)
     """
 
-    def __init__(self, strategy: ReadStrategy) -> None:
+    def __init__(self, strategy: ReadStrategy, desc_file: Path) -> None:
         self._read_strategy = strategy
+        self._descriptor_file = desc_file
 
     @property
     def read_strategy(self) -> ReadStrategy:
@@ -41,27 +43,29 @@ class FileReader(object):
     def read_strategy(self, strategy: ReadStrategy) -> None:
         self._read_strategy = strategy
 
-    @classmethod
-    def define_input_filename(cls, desc_file: dict):
+    def define_input_filename(self, desc_file: dict):
+        # Definir carpeta del archivo a leer
+        desc_file_path = desc_file.get('path')
+        if desc_file_path == '.':
+            desc_file_path = self._descriptor_file.parent.absolute().as_posix()
         # Definir nombre del archivo a leer
-        input_filename = os.path.join(desc_file.get('path'), desc_file.get('name'))
+        input_filename = os.path.join(desc_file_path, desc_file.get('name'))
         # Si el path no es absoluto, anteponer la carpeta con los descriptores
         if not os.path.isabs(input_filename):
             input_filename = os.path.join(ConfigFile.Instance().get('folders').get('descriptor_files'), input_filename)
         # Retornar el nombre del archivo a leer
         return input_filename
 
-    @classmethod
-    def define_output_filename(cls, desc_file: dict = None) -> str:
+    def define_output_filename(self, desc_file: dict = None) -> str:
         # Definir nombre del archivo a leer
-        input_filename = cls.define_input_filename(desc_file)
+        input_filename = self.define_input_filename(desc_file)
         # Definir el nombre del archivo NetCDF (para los casos en los que no se defina output_file)
         output_filename = f"{os.path.splitext(input_filename)[0]}.nc"
         # Definir el nombre del archivo NetCDF (para los casos en los que sí se defina output_file)
         if desc_file is not None and desc_file.get('output_file') is not None:
             # Obtener la carpeta de destino
             output_path = desc_file.get('output_file').get('path', os.path.dirname(output_filename))
-            # Si lo que se obtiene no es un path absoluto,  anteponer la carpeta con los descriptores
+            # Si lo que se obtiene no es un path absoluto, anteponer la carpeta con los descriptores
             if not os.path.isabs(output_path):
                 output_path = os.path.join(ConfigFile.Instance().get('folders').get('descriptor_files'), output_path)
             # Obtener el nombre del archivo de destino (sin carpeta, solo el nombre del archivo)
@@ -71,12 +75,11 @@ class FileReader(object):
         # Retornar el nombre definido
         return output_filename
 
-    @classmethod
-    def output_file_must_be_created(cls, desc_file: dict = None) -> bool:
+    def output_file_must_be_created(self, desc_file: dict = None) -> bool:
         # Leer configuración del script
         config = ConfigFile.Instance()
         # Si el archivo de salida no existe, debe ser creado
-        if not os.path.exists(cls.define_output_filename(desc_file)):
+        if not os.path.exists(self.define_output_filename(desc_file)):
             return True
         # Si la configuración del script indica que todos los archivos de salida deben ser creados, debe ser creado
         if config.get('force_output_update', False) is True:
@@ -441,6 +444,7 @@ class ReadCPTpredictor(ReadStrategy):
         df_info: List[CPTpredictorFileInfo] = self.__extract_cpt_predictor_file_info(file_name)
 
         # Identificar la variable en el nombre del archivo
+        print(file_name)
         file_variable = re.search(r'(precip|tmp2m)', file_name).group(0)
         file_variable = 'prcp' if file_variable == 'precip' else 't2m' if file_variable == 'tmp2m' else None
 
@@ -553,7 +557,9 @@ class ReadEREGoutputDET(ReadStrategy):
                 n_years = len(npz[data_variable])
                 # Crear dataset con los datos
                 final_ds = xr.Dataset(
-                    {file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))},
+                    data_vars={
+                        file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz[data_variable][:, :, :]))
+                    },
                     coords={
                         # "init_time" debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en
                         #      diciembre de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021.
@@ -572,7 +578,9 @@ class ReadEREGoutputDET(ReadStrategy):
             else:
                 # Crear dataset con los datos
                 final_ds = xr.Dataset(
-                    {file_variable: (['latitude', 'longitude'], np.squeeze(npz[data_variable][:, :]))},
+                    data_vars={
+                        file_variable: (['latitude', 'longitude'], np.squeeze(npz[data_variable][:, :]))
+                    },
                     coords={
                         'latitude': npz['lat'],
                         'longitude': npz['lon']
@@ -658,7 +666,9 @@ class ReadEREGoutputPROB(ReadStrategy):
 
                 # Crear dataset con los datos
                 final_ds = xr.Dataset(
-                    {file_variable: (['init_time', 'latitude', 'longitude', 'category'], for_terciles)},
+                    data_vars={
+                        file_variable: (['init_time', 'latitude', 'longitude', 'category'], for_terciles)
+                    },
                     coords={
                         # Time debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre
                         #      de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT
@@ -694,7 +704,9 @@ class ReadEREGoutputPROB(ReadStrategy):
 
                 # Crear dataset con los datos
                 final_ds = xr.Dataset(
-                    {file_variable: (['latitude', 'longitude', 'category'], for_terciles)},
+                    data_vars={
+                        file_variable: (['latitude', 'longitude', 'category'], for_terciles)
+                    },
                     coords={
                         'latitude': npz['lat'],
                         'longitude': npz['lon'],
@@ -713,6 +725,65 @@ class ReadEREGoutputPROB(ReadStrategy):
 
         # Agregar atributos que describan la variable
         final_ds[file_variable].attrs['units'] = '%'
+
+        # Filtrar años, en caso de que sea necesario
+        if desc_file is not None and desc_file.get('filter_years') is not None:
+            min_year = desc_file.get('filter_years').get('min_year')
+            if min_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year >= min_year, drop=True)
+            max_year = desc_file.get('filter_years').get('max_year')
+            if max_year is not None:
+                final_ds = final_ds.where(final_ds.init_time.dt.year <= max_year, drop=True)
+
+        # Return generated dataset
+        return final_ds
+
+
+class ReadEREGobservedData(ReadStrategy):
+    """
+    A Concrete Strategy (Desing Pattern -> Strategy)
+    """
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
+        # Identificar la variable en el nombre del archivo
+        file_variable = re.search(r'(prec|tref)', file_name).group(0)
+        file_variable = 'prcp' if file_variable == 'prec' else 't2m' if file_variable == 'tref' else None
+
+        # Identificar trimestre objetivo
+        season_months = re.search(rf'({"|".join(Mpro.trimesters[1:])})', file_name).group(0)
+        first_month = Mpro.first_month_of_trimester(season_months)
+
+        # Extraer de la configuración el primer año en el archivo
+        first_year = int(re.search(r'_(\d{4})_', file_name).group(1))
+
+        # Leer archivo de tipo npz
+        with np.load(file_name) as npz:
+            # Identificar variable con datos
+            # OBS: este archivo .npz tiene el valor determinístico -que se guarda en el netcdf-, el tercil al cual
+            # corresponde ese valor y la categoría -ni el tercil ni la categoría se guardan en el netcdf final-.
+            data_variable = [x for x in npz.files if x not in ['lats_obs', 'lons_obs']]
+
+            # Identificar la cantidad de años en el archivo
+            n_years = len(npz['obs_dt'])
+
+            # Crear dataset con los datos
+            final_ds = xr.Dataset(
+                data_vars={
+                    file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz['obs_dt'][:, :, :]))
+                },
+                coords={
+                    'init_time': pd.date_range(f"{first_year}-{first_month}-01", periods=n_years, freq='12MS'),
+                    'latitude': npz['lats_obs'],
+                    'longitude': npz['lons_obs']
+                })
+
+        # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
+        for year in final_ds.init_time.dt.year:
+            n_days = Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+            final_ds.loc[{'init_time': str(year.values)}] = final_ds.sel(init_time=str(year.values)) * n_days
+
+        # Agregar atributos que describan la variable
+        unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
+        final_ds[file_variable].attrs['units'] = f'{unidad_de_medida} anomaly'
 
         # Filtrar años, en caso de que sea necesario
         if desc_file is not None and desc_file.get('filter_years') is not None:

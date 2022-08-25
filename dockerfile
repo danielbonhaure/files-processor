@@ -130,21 +130,32 @@ WORKDIR /home/$NON_ROOT_USR
 USER $NON_ROOT_USR
 
 # CONSTRUIR CONTENEDOR
-# docker build -f dockerfile \
+# export DOCKER_BUILDKIT=1
+# docker build --file dockerfile \
 #        --build-arg ROOT_PWD=nonroot \
 #        --build-arg NON_ROOT_PWD=nonroot \
 #        --build-arg NON_ROOT_UID=$(stat -c "%u" .) \
 #        --build-arg NON_ROOT_GID=$(stat -c "%g" .) \
-#        -t file_processor .
+#        --tag files-processor .
 
 # CORRER OPERACIONALMENTE CON CRON
-# docker run --name file_processor --rm \
-#        --volume $(pwd)/descriptor_files:/opt/processor/descriptor_files \
-#        --volume $(pwd)/config.yaml:/opt/processor/config.yaml \
-#        --detach file_processor:latest
+# docker run --name files-processor --rm \
+#        --volume /data/acc-cpt/output:/opt/processor/descriptor_files/cpt-output \
+#        --volume /data/acc-cpt/input/predictands:/opt/processor/descriptor_files/cpt-obs-data \
+#        --volume /data/acc-cpt/input/predictors:/opt/processor/descriptor_files/cpt-predictors \
+#        --volume /data/ereg/generados/nmme_output:/opt/processor/descriptor_files/ereg-output \
+#        --detach files-processor:latest
 
 # CORRER MANUALMENTE
-# docker run --name file_processor --rm \
+# docker run --name files-processor --rm \
+#        --volume /data/acc-cpt/output:/opt/processor/descriptor_files/cpt-output \
+#        --volume /data/acc-cpt/input/predictands:/opt/processor/descriptor_files/cpt-obs-data \
+#        --volume /data/acc-cpt/input/predictors:/opt/processor/descriptor_files/cpt-predictors \
+#        --volume /data/ereg/generados/nmme_output:/opt/processor/descriptor_files/ereg-output \
+#        --detach files-processor:latest /usr/local/bin/python /opt/processor/main.py
+
+# CORRER ARCHIVOS DE PRUEBA MANUALMENTE
+# docker run --name files-processor --rm \
 #        --volume $(pwd)/descriptor_files:/opt/processor/descriptor_files \
 #        --volume $(pwd)/config.yaml:/opt/processor/config.yaml \
-#        file_processor:latest /usr/local/bin/python /opt/processor/main.py
+#        --detach files-processor:latest /usr/local/bin/python /opt/processor/main.py

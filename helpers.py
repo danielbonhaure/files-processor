@@ -72,6 +72,33 @@ class MonthsProcessor:
         elif trimester == 'DJF':
             return calendar.mdays[12] + calendar.mdays[1] + calendar.mdays[2] + 1 if isleap else 0
 
+    @classmethod
+    def first_month_of_trimester(cls, trimester: str) -> int:
+        if trimester == 'JFM':
+            return 1
+        elif trimester == 'FMA':
+            return 2
+        elif trimester == 'MAM':
+            return 3
+        elif trimester == 'AMJ':
+            return 4
+        elif trimester == 'MJJ':
+            return 5
+        elif trimester == 'JJA':
+            return 6
+        elif trimester == 'JAS':
+            return 7
+        elif trimester == 'ASO':
+            return 8
+        elif trimester == 'SON':
+            return 9
+        elif trimester == 'OND':
+            return 10
+        elif trimester == 'NDJ':
+            return 11
+        elif trimester == 'DJF':
+            return 12
+
 
 @dataclass
 class CPToutputFileInfo(object):

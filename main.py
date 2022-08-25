@@ -7,10 +7,12 @@ import logging
 if os.path.dirname(__file__):
     os.chdir(os.path.dirname(__file__))
 
+from pathlib import Path
+
 from errors import DescriptorError
 from configuration import ConfigFile, DescriptorFile
 from read_strategies import FileReader
-from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB
+from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, ReadEREGobservedData
 from read_strategies import ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor
 from read_strategies import ReadCRCSASobs
 
@@ -20,6 +22,8 @@ def define_read_strategy(file_type: str, descriptor_filename: str):
         return ReadEREGoutputDET()
     elif file_type == 'ereg_prob_output':
         return ReadEREGoutputPROB()
+    elif file_type == 'ereg_obs_data':
+        return ReadEREGobservedData()
     elif file_type == 'crcsas_obs_data':
         return ReadCRCSASobs()
     elif file_type == 'cpt_det_output':
@@ -48,43 +52,37 @@ if __name__ == '__main__':
     desc_files_folder = config.get('folders').get('descriptor_files')
 
     # Obtener listado de archivos de configuración
-    desc_files = sorted(os.listdir(desc_files_folder))
-    desc_files = [f for f in desc_files if f.endswith('.yaml') and f != 'template.yaml']
+    desc_files = sorted(Path(desc_files_folder).rglob("*.yaml"))
+    desc_files = [f for f in desc_files if f != 'template.yaml']
 
     # Procesar cada uno de los archivos de configuración
     files_count = 0
     for dn, df in enumerate(desc_files):
 
         # Leer el archivo de configuración
-        descriptor = DescriptorFile(f'{desc_files_folder}/{df}')
+        descriptor = DescriptorFile(df.absolute().as_posix())
 
         # Obtener listado de archivos a transformar
         proc_files = descriptor.get('files')
-
-        # Descartar archivos que no deben ser creados
-        proc_files = [f for f in proc_files if FileReader.output_file_must_be_created(f)]
-
-        # Si no hay archivos por procesar, continuar con el siguiente descriptor
-        if len(proc_files) == 0:
-            continue
-
-        # Agregar una línea para separar la salida del log
-        logging.info('')
 
         # Convertir los archivos indicados en el archivo de configuración
         for pn, pf in enumerate(proc_files):
 
             # Definir estrategia de lectura del archivo
-            read_strategy = define_read_strategy(pf.get('type'), df)
+            read_strategy = define_read_strategy(pf.get('type'), df.absolute().as_posix())
 
             # Definir el objeto encargado de leer y convertir el archivo
-            reader = FileReader(read_strategy)
+            reader = FileReader(read_strategy, df)
+
+            # Si el archivo ya existe y no debe ser sobrescrito, no se deben ejecutar las líneas a continuación
+            if not reader.output_file_must_be_created(pf):
+                continue
 
             # Convertir archivo a NetCDF
             reader.convert_file_to_netcdf(desc_file=pf)
 
             # Informar avance
-            logging.info(f'Processed files: {pn+1}/{len(proc_files)} -- ({df})')
+            logging.info(f'Processed files: {pn+1}/{len(proc_files)} -- ({df.absolute().as_posix()})')
 
             # Contar archivo
             files_count += 1
