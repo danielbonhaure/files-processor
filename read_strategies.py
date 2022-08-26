@@ -809,9 +809,10 @@ class ReadCRCSASobs(ReadStrategy):
 
         # El archivo es un csv, así que solo se importa con pandas y listo
         final_df = pd.read_csv(file_name, sep=';')
+        final_df = final_df.rename(columns={'time': 'init_time'})
 
         # Reindexar el dataframe
-        final_df = final_df.set_index(['time', 'latitude', 'longitude']).sort_index()
+        final_df = final_df.set_index(['init_time', 'latitude', 'longitude']).sort_index()
 
         # Transformar dataframe a dataset
         final_ds = final_df.to_xarray()
