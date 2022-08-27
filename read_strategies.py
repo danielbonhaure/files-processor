@@ -763,12 +763,12 @@ class ReadEREGobservedData(ReadStrategy):
             data_variable = [x for x in npz.files if x not in ['lats_obs', 'lons_obs']]
 
             # Identificar la cantidad de años en el archivo
-            n_years = len(npz['obs_dt'])
+            n_years = len(npz['obs_3m'])
 
             # Crear dataset con los datos
             final_ds = xr.Dataset(
                 data_vars={
-                    file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz['obs_dt'][:, :, :]))
+                    file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz['obs_3m'][:, :, :]))
                 },
                 coords={
                     'init_time': pd.date_range(f"{first_year}-{first_month}-01", periods=n_years, freq='12MS'),
