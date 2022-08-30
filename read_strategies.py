@@ -597,8 +597,14 @@ class ReadEREGoutputDET(ReadStrategy):
                     init_time=pd.date_range(f"{forecast_year}-{forecast_month}-01", periods=1)).copy(deep=True)
 
         # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
+        # OBS: Al generar el archivo observado, marisol no divide el valor por la cantidad de días del mes, sino por
+        # 30 para todos los meses, por lo tanto, para volver al valor total del trimestre, se debe multiplicar siempre
+        # por 90 (30*3) y no por la cantidad exacta de días en el trimestre.
+        # Ver: método select_months de la clase Observ en archivo observation.py del repo ereg_calibracion_combinacion
+        # Como los pronósticos determinísticos se obtienen a partir de estos datos observados, lo anterior también
+        # aplica para estos, y, por lo tanto, para obtener el total del trimestre, la multiplicación deber ser por 90.
         for year in final_ds.init_time.dt.year:
-            n_days = Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+            n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
             final_ds.loc[{'init_time': str(year.values)}] = final_ds.sel(init_time=str(year.values)) * n_days
 
         # Agregar atributos que describan la variable
@@ -777,8 +783,12 @@ class ReadEREGobservedData(ReadStrategy):
                 })
 
         # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
+        # OBS: Al generar el archivo observado, marisol no divide el valor por la cantidad de días del mes, sino por
+        # 30 para todos los meses, por lo tanto, para volver al valor total del trimestre, se debe multiplicar siempre
+        # por 90 (30*3) y no por la cantidad exacta de días en el trimestre.
+        # Ver: método select_months de la clase Observ en archivo observation.py del repo ereg_calibracion_combinacion
         for year in final_ds.init_time.dt.year:
-            n_days = Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+            n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
             final_ds.loc[{'init_time': str(year.values)}] = final_ds.sel(init_time=str(year.values)) * n_days
 
         # Agregar atributos que describan la variable
