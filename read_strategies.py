@@ -793,7 +793,7 @@ class ReadEREGobservedData(ReadStrategy):
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
-        final_ds[file_variable].attrs['units'] = f'{unidad_de_medida} anomaly'
+        final_ds[file_variable].attrs['units'] = f'{unidad_de_medida}'
 
         # Filtrar años, en caso de que sea necesario
         if desc_file is not None and desc_file.get('filter_years') is not None:
