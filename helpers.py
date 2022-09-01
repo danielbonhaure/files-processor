@@ -4,6 +4,7 @@ from itertools import chain
 from dataclasses import dataclass
 from typing import Union
 from datetime import datetime
+from typing import List
 
 import locale
 import calendar
@@ -98,6 +99,13 @@ class MonthsProcessor:
             return 11
         elif trimester == 'DJF':
             return 12
+
+    @classmethod
+    def n_days_in_months(cls, fcst_year: int, fcst_month: int, trgt_months: List[int]) -> int:
+        n_days = 0
+        for c_month in trgt_months:
+            n_days += calendar.monthrange(fcst_year if fcst_month <= c_month else fcst_year+1, c_month)[1]
+        return n_days
 
 
 @dataclass

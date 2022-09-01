@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from configuration import ConfigFile
 from helpers import CPToutputFileInfo, CPTpredictorFileInfo
-from helpers import MonthsProcessor as Mpro
+from helpers import crange, MonthsProcessor as Mpro
 
 from abc import ABC, abstractmethod
 from typing import List
@@ -17,7 +17,6 @@ import os
 import pandas as pd
 import numpy as np
 import xarray as xr
-import calendar
 
 
 """ 
@@ -130,8 +129,8 @@ class ReadCPToutputDET(ReadStrategy):
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
 
         # Obtener el nombre de las columnas, las longitude y las latitudes
-        header_df = pd.read_csv(file_name, sep='\t', header=0, index_col=0,
-                                skiprows=info.header_line, nrows=2, na_values=info.na_values)
+        header_df = pd.read_csv(file_name, sep='\t', header=0, index_col=0, skiprows=info.header_line, nrows=2,
+                                na_values=[info.na_values, int(info.na_values), float(info.na_values)])
 
         # En los archivos de salida del CPT:
         # la línea que empieza con cpt:X es la longitud, y la línea que empieza con cpt:Y es la latitud
@@ -144,7 +143,8 @@ class ReadCPToutputDET(ReadStrategy):
 
         # Obtener los datos en el archivo
         data_df = pd.read_csv(file_name, sep='\t', names=header_df.columns.to_list(), index_col=0,
-                              skiprows=info.data_first_line, nrows=info.n_rows, na_values=info.na_values)
+                              skiprows=info.data_first_line, nrows=info.n_rows,
+                              na_values=[info.na_values, int(info.na_values), float(info.na_values)])
 
         # Crear df con índice igual a longitude, latitude, year
         final_df = pd.DataFrame()
@@ -257,8 +257,8 @@ class ReadCPToutputPROB(ReadStrategy):
         file_variable = re.search(r'(prcp|t2m)', file_name).group(0)
 
         # Obtener el nombre de las columnas, las longitude y las latitudes
-        header_df = pd.read_csv(file_name, sep='\t', header=0, index_col=0,
-                                skiprows=info.header_line, nrows=2, na_values=info.na_values)
+        header_df = pd.read_csv(file_name, sep='\t', header=0, index_col=0, skiprows=info.header_line, nrows=2,
+                                na_values=[info.na_values, int(info.na_values), float(info.na_values)])
 
         # En los archivos de salida del CPT:
         # la línea que empieza con cpt:X es la longitud, y la línea que empieza con cpt:Y es la latitud
@@ -274,7 +274,8 @@ class ReadCPToutputPROB(ReadStrategy):
         for i, category in enumerate(['below', 'normal', 'above']):
             skip_rows = info.data_first_line + (info.field_n_rows * i) + (info.header_n_rows * i) + (info.n_rows * i)
             cat_data_df = pd.read_csv(file_name, sep='\t', names=header_df.columns.to_list(), index_col=0,
-                                      skiprows=skip_rows, nrows=info.n_rows, na_values=info.na_values)
+                                      skiprows=skip_rows, nrows=info.n_rows,
+                                      na_values=[info.na_values, int(info.na_values), float(info.na_values)])
             category_df = pd.DataFrame()
             for year in cat_data_df.index.to_list():
                 year_data_df = pd.DataFrame({file_variable: cat_data_df.loc[year]})
@@ -402,7 +403,8 @@ class ReadCPTpredictand(ReadStrategy):
         coord_data_df = longitude_df.join(latitude_df)
 
         # Obtener los datos en el archivo
-        data_df = pd.read_csv(file_name, sep='\t', names=header_df.columns.to_list(), index_col=0, skiprows=3)
+        data_df = pd.read_csv(file_name, sep='\t', names=header_df.columns.to_list(), index_col=0, skiprows=3,
+                              na_values=['-999', -999, -999.0])
 
         # Crear df con índice igual a longitude, latitude, year
         final_df = pd.DataFrame()
@@ -443,27 +445,82 @@ class ReadCPTpredictor(ReadStrategy):
         # Extraer información del archivo CPT
         df_info: List[CPTpredictorFileInfo] = self.__extract_cpt_predictor_file_info(file_name)
 
+        # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
+        months_regex = re.search(rf'({"|".join(Mpro.months_abbr[1:])})ic_(\d*)-?(\d*)?_', file_name)
+        forecast_month, first_target_month = Mpro.month_abbr_to_int(months_regex.group(1)), int(months_regex.group(2))
+
         # Identificar la variable en el nombre del archivo
-        print(file_name)
         file_variable = re.search(r'(precip|tmp2m)', file_name).group(0)
         file_variable = 'prcp' if file_variable == 'precip' else 't2m' if file_variable == 'tmp2m' else None
 
         # Gen dataframe for current file accessing only rows with data
         final_df = pd.DataFrame()
         for info in df_info:
-            df = pd.read_csv(file_name, sep='\t', index_col=0, skiprows=info.field_line,
-                             nrows=info.n_rows, na_values='-999')
+            df = pd.read_csv(file_name, sep='\t', index_col=0, skiprows=info.field_line, nrows=info.n_rows,
+                             na_values=[info.na_values, int(info.na_values), float(info.na_values)])
             df['latitude'] = df.index
             df = df.melt(id_vars=['latitude'], var_name='longitude', value_name=file_variable)
             df['longitude'] = df['longitude'].astype(float)
             df.insert(0, 'init_time', info.start_date)
             final_df = pd.concat([final_df, df])
 
+        # Modificar años, en caso de que sea necesario
+        if desc_file is not None and desc_file.get('swap_years') is not None:
+
+            # Obtener último año de hindcast y primer año pronosticado
+            last_hindcast_year = desc_file.get('swap_years').get('last_hindcast_year')
+            first_forecast_year = desc_file.get('swap_years').get('first_forecast_year')
+
+            # OJO: El archivo que se está leyendo indica como año, el año del primer mes objetivo (y no el año de
+            # inicialización del pronóstico). Sin embargo, el NetCDF generado debe indicar el año de inicialización
+            # en la variable init_time (y no el año del primer mes objetivo).
+            # Por lo tanto, algunas veces es necesario recalcular last_hindcast_year y first_forecast_year.
+            # Esto ocurre por ejemplo para los pronósticos inicializados en diciembre y que tienen como primer mes
+            # objetivo a enero (en estos tanto last_hindcast_year como first_forecast_year están un año por delante).
+            last_hindcast_year = last_hindcast_year - (1 if forecast_month > first_target_month else 0)
+            first_forecast_year = first_forecast_year - (1 if forecast_month > first_target_month else 0)
+
+            # Solamente es necesario renombrar los años cuando el primer año de pronóstico (first_forecast_year)
+            # es al menos dos años posterior al último año de hindcast (last_hindcast_year).
+            if first_forecast_year - last_hindcast_year >= 2:
+
+                # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
+                years_to_swap = set([y for y in final_df['init_time'].dt.year if y > last_hindcast_year])
+
+                # Se crea un dataframe con los años renombrados
+                anhos_renombrados = pd.DataFrame()
+
+                # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
+                # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
+                for n, y in enumerate(years_to_swap):
+                    # Se hace una copia profunda del año a renombrar
+                    aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
+                    # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
+                    aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
+                    # Se agrega el dataframe aux al df con los años renombrados
+                    anhos_renombrados = pd.concat([anhos_renombrados, aux])
+                    # Se asgina NA al año que ya fue renombrado
+                    final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
+
+                # Se reemplaza los valores con NA en final_df con los valores corregidos
+                final_df = final_df.merge(anhos_renombrados, how='outer')
+
         # Reindexar el dataframe
         final_df = final_df.set_index(['init_time', 'latitude', 'longitude']).sort_index()
 
         # Transformar dataframe a dataset
         final_ds = final_df.to_xarray()
+
+        # Identificar el mes de corrida y los meses objetivo en el nombre del archivo
+        months_regex = re.search(rf'({"|".join(Mpro.months_abbr[1:])})ic_(\d*)-?(\d*)?_', file_name)
+        first_trgt_month = int(months_regex.group(2))
+        last_trgt_month = int(months_regex.group(3)) if months_regex.group(3) else None
+        trgt_months = [first_trgt_month] if last_trgt_month is None else crange(first_trgt_month, last_trgt_month+1, 12)
+
+        # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
+        for init_year, init_month in zip(final_ds.init_time.dt.year, final_ds.init_time.dt.month):
+            n_days = Mpro.n_days_in_months(int(init_year.values), int(init_month.values), trgt_months)
+            final_ds.loc[{'init_time': str(init_year.values)}] = final_ds.sel(init_time=str(init_year.values)) * n_days
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
