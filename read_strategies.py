@@ -518,9 +518,10 @@ class ReadCPTpredictor(ReadStrategy):
         trgt_months = [first_trgt_month] if last_trgt_month is None else crange(first_trgt_month, last_trgt_month+1, 12)
 
         # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
-        for init_year, init_month in zip(final_ds.init_time.dt.year, final_ds.init_time.dt.month):
-            n_days = Mpro.n_days_in_months(int(init_year.values), int(init_month.values), trgt_months)
-            final_ds.loc[{'init_time': str(init_year.values)}] = final_ds.sel(init_time=str(init_year.values)) * n_days
+        if file_variable == 'prcp':
+            for init_year, init_month in zip(final_ds.init_time.dt.year.values, final_ds.init_time.dt.month.values):
+                n_days = Mpro.n_days_in_months(int(init_year.values), int(init_month.values), trgt_months)
+                final_ds.loc[{'init_time': str(init_year)}] = final_ds.sel(init_time=str(init_year)) * n_days
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
@@ -660,9 +661,10 @@ class ReadEREGoutputDET(ReadStrategy):
         # Ver: método select_months de la clase Observ en archivo observation.py del repo ereg_calibracion_combinacion
         # Como los pronósticos determinísticos se obtienen a partir de estos datos observados, lo anterior también
         # aplica para estos, y, por lo tanto, para obtener el total del trimestre, la multiplicación deber ser por 90.
-        for year in final_ds.init_time.dt.year:
-            n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
-            final_ds.loc[{'init_time': str(year.values)}] = final_ds.sel(init_time=str(year.values)) * n_days
+        if file_variable == 'prcp':
+            for year in final_ds.init_time.dt.year.values:
+                n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+                final_ds.loc[{'init_time': str(year)}] = final_ds.sel(init_time=str(year)) * n_days
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
@@ -844,9 +846,10 @@ class ReadEREGobservedData(ReadStrategy):
         # 30 para todos los meses, por lo tanto, para volver al valor total del trimestre, se debe multiplicar siempre
         # por 90 (30*3) y no por la cantidad exacta de días en el trimestre.
         # Ver: método select_months de la clase Observ en archivo observation.py del repo ereg_calibracion_combinacion
-        for year in final_ds.init_time.dt.year:
-            n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
-            final_ds.loc[{'init_time': str(year.values)}] = final_ds.sel(init_time=str(year.values)) * n_days
+        if file_variable == 'prcp':
+            for year in final_ds.init_time.dt.year.values:
+                n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+                final_ds.loc[{'init_time': str(year)}] = final_ds.sel(init_time=str(year)) * n_days
 
         # Agregar atributos que describan la variable
         unidad_de_medida = 'mm' if file_variable == 'prcp' else 'Celsius' if file_variable == 't2m' else None
