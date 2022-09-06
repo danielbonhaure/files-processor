@@ -114,7 +114,7 @@ RUN adduser $NON_ROOT_USR sudo
 RUN chown -R $NON_ROOT_UID:$NON_ROOT_GID /opt/processor
 
 # Setup cron for run once a month
-RUN (echo "0 0 16 * * /usr/local/bin/python /opt/processor/main.py >> /proc/1/fd/1 2>> /proc/1/fd/1") | crontab -u $NON_ROOT_USR -
+RUN (echo "0 0 18 * * /usr/local/bin/python /opt/processor/main.py >> /proc/1/fd/1 2>> /proc/1/fd/1") | crontab -u $NON_ROOT_USR -
 
 # Add Tini (https://github.com/krallin/tini#using-tini)
 ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
@@ -139,7 +139,7 @@ USER $NON_ROOT_USR
 #        --tag files-processor .
 
 # CORRER OPERACIONALMENTE CON CRON
-# docker run --name files-processor --rm \
+# docker run --name files-processor \
 #        --volume /data/acc-cpt/output:/opt/processor/descriptor_files/cpt-output \
 #        --volume /data/acc-cpt/input/predictands:/opt/processor/descriptor_files/cpt-obs-data \
 #        --volume /data/acc-cpt/input/predictors:/opt/processor/descriptor_files/cpt-predictors \
