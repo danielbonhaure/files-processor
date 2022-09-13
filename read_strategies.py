@@ -520,7 +520,7 @@ class ReadCPTpredictor(ReadStrategy):
         # Corregir valor total pronosticado (se debe multiplicar por la cantidad de días del mes o del trimestre)
         if file_variable == 'prcp':
             for init_year, init_month in zip(final_ds.init_time.dt.year.values, final_ds.init_time.dt.month.values):
-                n_days = Mpro.n_days_in_months(int(init_year.values), int(init_month.values), trgt_months)
+                n_days = Mpro.n_days_in_months(int(init_year), int(init_month), trgt_months)
                 final_ds.loc[{'init_time': str(init_year)}] = final_ds.sel(init_time=str(init_year)) * n_days
 
         # Agregar atributos que describan la variable
@@ -663,7 +663,7 @@ class ReadEREGoutputDET(ReadStrategy):
         # aplica para estos, y, por lo tanto, para obtener el total del trimestre, la multiplicación deber ser por 90.
         if file_variable == 'prcp':
             for year in final_ds.init_time.dt.year.values:
-                n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+                n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year)))
                 final_ds.loc[{'init_time': str(year)}] = final_ds.sel(init_time=str(year)) * n_days
 
         # Agregar atributos que describan la variable
@@ -848,7 +848,7 @@ class ReadEREGobservedData(ReadStrategy):
         # Ver: método select_months de la clase Observ en archivo observation.py del repo ereg_calibracion_combinacion
         if file_variable == 'prcp':
             for year in final_ds.init_time.dt.year.values:
-                n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year.values)))
+                n_days = 90  # Mpro.n_days_in_trimester(season_months, calendar.isleap(int(year)))
                 final_ds.loc[{'init_time': str(year)}] = final_ds.sel(init_time=str(year)) * n_days
 
         # Agregar atributos que describan la variable
