@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     # Obtener listado de archivos de configuración
     desc_files = sorted(Path(desc_files_folder).rglob("*.yaml"))
-    desc_files = [f for f in desc_files if f != 'template.yaml']
+    desc_files = [f for f in desc_files if f.name != 'template.yaml']
 
     # Procesar cada uno de los archivos de configuración
     files_count = 0
