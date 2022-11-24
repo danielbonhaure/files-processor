@@ -41,11 +41,13 @@ def define_read_strategy(file_type: str, descriptor_filename: str):
 
 if __name__ == '__main__':
     # Conf logging
-    logging.basicConfig(format='%(asctime)s -- %(message)s', datefmt='%Y/%m/%d %I:%M:%S %p', level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s -- %(levelname)7s -- %(message)s',
+                        datefmt='%Y/%m/%d %I:%M:%S %p', level=logging.INFO)
 
     # Reportar inicio de la ejecución
     logging.info('')
     logging.info('THE START')
+    logging.info('')
 
     # Read processor config file
     config = ConfigFile.Instance()
@@ -57,6 +59,8 @@ if __name__ == '__main__':
 
     # Procesar cada uno de los archivos de configuración
     files_count = 0
+    missing_files_count = 0
+    processed_files_count = 0
     for dn, df in enumerate(desc_files):
 
         # Leer el archivo de configuración
@@ -68,11 +72,21 @@ if __name__ == '__main__':
         # Convertir los archivos indicados en el archivo de configuración
         for pn, pf in enumerate(proc_files):
 
+            # Contar archivo
+            files_count += 1
+
             # Definir estrategia de lectura del archivo
             read_strategy = define_read_strategy(pf.get('type'), df.absolute().as_posix())
 
             # Definir el objeto encargado de leer y convertir el archivo
             reader = FileReader(read_strategy, df)
+
+            # Si el archivo no existe, reportar el problema y continuar
+            input_file = reader.define_input_filename(pf)
+            if not os.path.isfile(input_file):
+                missing_files_count += 1
+                logging.warning(f"Missing file: {input_file}")
+                continue
 
             # Si el archivo ya existe y no debe ser sobrescrito, no se deben ejecutar las líneas a continuación
             if not reader.output_file_must_be_created(pf):
@@ -81,16 +95,26 @@ if __name__ == '__main__':
             # Convertir archivo a NetCDF
             reader.convert_file_to_netcdf(desc_file=pf)
 
+            # Contar archivos procesados
+            processed_files_count += 1
+
             # Informar avance
             logging.info(f'Processed files: {pn+1}/{len(proc_files)} -- ({df.absolute().as_posix()})')
-
-            # Contar archivo
-            files_count += 1
 
     # En caso de que no se haya procesado ningún archivo, se informa lo siguiente
     if len(desc_files) == 0 or files_count == 0:
         logging.info('')
-        logging.info('Processed files: 0/0 -- ()')
+        logging.info('Processed files: 0/0')
+
+    # Reportar la cantida de archivos procesados
+    if files_count > 0:
+        logging.info('')
+        logging.info(f'Processed files: {processed_files_count}/{files_count}')
+
+    # Reportar la cantidad de archivos perdidos
+    if missing_files_count > 0:
+        logging.info('')
+        logging.warning(f'Missing files: {missing_files_count}/{files_count}')
 
     # Reportar final de la ejecución
     logging.info('')
