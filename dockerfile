@@ -4,7 +4,7 @@
 #############################
 
 # Create image
-FROM python:3.9-slim-bullseye AS py_builder
+FROM python:slim AS py_builder
 
 # set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
@@ -35,7 +35,7 @@ RUN python3 -m pip install --upgrade pip && \
 ########################
 
 # Create image
-FROM python:3.9-slim-bullseye AS final_image
+FROM python:slim AS final_image
 
 # set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
