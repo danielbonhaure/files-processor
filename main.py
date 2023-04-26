@@ -40,6 +40,14 @@ def define_read_strategy(file_type: str, descriptor_filename: str):
 
 
 if __name__ == '__main__':
+
+    # Set pid file
+    pid_file = '/tmp/files-processor.pid'
+
+    # Get PID and save it to a file
+    with open(pid_file, 'w') as f:
+        f.write(f'{os.getpid()}')
+
     # Conf logging
     logging.basicConfig(format='%(asctime)s -- %(levelname)7s -- %(message)s',
                         datefmt='%Y/%m/%d %I:%M:%S %p', level=logging.INFO)
@@ -120,3 +128,6 @@ if __name__ == '__main__':
     logging.info('')
     logging.info('THE END')
     logging.info('')
+
+    # Remove pid file (only if there were no errors)
+    os.remove(pid_file)
