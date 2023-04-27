@@ -804,6 +804,66 @@ class ReadEREGoutputPROB(ReadStrategy):
         return final_ds
 
 
+class ReadEREGoutputSISSA(ReadStrategy):
+    """
+    A Concrete Strategy (Desing Pattern -> Strategy)
+    """
+    def read_data(self, file_name: str, desc_file: dict = None) -> Dataset:
+        # Identificar el mes de corrida en el nombre del archivo
+        forecast_month = re.search(rf'({"|".join(Mpro.months_abbr[1:])})', file_name).group(0)
+        forecast_month = Mpro.month_abbr_to_int(forecast_month)
+
+        # Identificar la variable en el nombre del archivo
+        file_variable = re.search(r'(prec|tref)', file_name).group(0)
+        file_variable = 'prcp' if file_variable == 'prec' else 't2m' if file_variable == 'tref' else None
+
+        # Leer archivo de tipo npz
+        with np.load(file_name) as npz:
+            # Identificar variable con datos
+            data_variable = [x for x in npz.files if x not in ['lat', 'lon']][0]
+
+            # Nombre de dimensiones: ['category', 'latitude', 'longitude']
+            for_quintiles = np.squeeze(npz[data_variable][:, :, :])
+
+            # Se extraen las probabilidades en el archivo npz
+            below = for_quintiles[0, :, :]
+            near_as = for_quintiles[1, :, :]  # normal + below
+            # Se calcula la probabilidad de un evento superior a la media
+            above = 1 - near_as
+            normal = near_as - below
+
+            # Se crea la matriz con la que se creará el dataset
+            for_quintiles = np.concatenate([below[:, :, np.newaxis], normal[:, :, np.newaxis],
+                                            above[:, :, np.newaxis]], axis=2)
+
+            # Crear dataset con los datos
+            final_ds = xr.Dataset(
+                data_vars={
+                    file_variable: (['latitude', 'longitude', 'category'], for_quintiles)
+                },
+                coords={
+                    'latitude': npz['lat'],
+                    'longitude': npz['lon'],
+                    'category': ['below', 'normal', 'above']
+                })
+            # Identificar el año de pronósticos real_time
+            forecast_year = re.search(rf'(?:{"|".join(Mpro.months_abbr[1:])})(\d{{4}})', file_name).group(1)
+            # Agregar init_time al dataset
+            # "init_time" debe ser la fecha de inicio de la corrida, es decir, para un prono corrido en diciembre
+            #      de 2020 para enero de 2021, init_time debe tener como año al 2020, no el 2021. CPT retorna como
+            #      año en los archivos de salida, el año del primer mes objetivo, es decir, 2021 en el ejemplo
+            #      anterior, por lo que, en el caso del CPT, el año en los archivos de salida no pueden usarse
+            #      sin pre-procesarlos.
+            final_ds = final_ds.expand_dims(
+                init_time=pd.date_range(f"{forecast_year}-{forecast_month}-01", periods=1)).copy(deep=True)
+
+        # Agregar atributos que describan la variable
+        final_ds[file_variable].attrs['units'] = '%'
+
+        # Return generated dataset
+        return final_ds
+
+
 class ReadEREGobservedData(ReadStrategy):
     """
     A Concrete Strategy (Desing Pattern -> Strategy)

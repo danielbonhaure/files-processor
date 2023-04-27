@@ -12,7 +12,7 @@ from pathlib import Path
 from errors import DescriptorError
 from configuration import ConfigFile, DescriptorFile
 from read_strategies import FileReader
-from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, ReadEREGobservedData
+from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, ReadEREGoutputSISSA, ReadEREGobservedData
 from read_strategies import ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor
 from read_strategies import ReadCRCSASobs
 
@@ -22,6 +22,8 @@ def define_read_strategy(file_type: str, descriptor_filename: str):
         return ReadEREGoutputDET()
     elif file_type == 'ereg_prob_output':
         return ReadEREGoutputPROB()
+    elif file_type == 'ereg_sissa_output':
+        return ReadEREGoutputSISSA()
     elif file_type == 'ereg_obs_data':
         return ReadEREGobservedData()
     elif file_type == 'crcsas_obs_data':
