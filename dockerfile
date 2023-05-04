@@ -8,10 +8,10 @@
 ARG PYTHON_VERSION=3.10
 
 # Set APP installation folder
-ARG APP_HOME=/opt/processor
+ARG APP_HOME=/opt/files-processor
 
 # App data folder
-ARG APP_DATA=/data/processor
+ARG APP_DATA=/data/files-processor
 
 # Set user name and id
 ARG USR_NAME="nonroot"
@@ -214,7 +214,8 @@ then \n\
 else \n\
   exit 0 \n\
 fi \n\
-\n" > /opt/check-healthy.sh
+\n" > /check-healthy.sh
+RUN chmod a+x /check-healthy.sh
 
 # Definir variables de entorno para el contendor final
 ENV CRON_TIME_STR=${CRON_TIME_STR}
