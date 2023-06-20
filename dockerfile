@@ -321,7 +321,7 @@ CMD ["sh", "/opt/pycharm/bin/pycharm.sh", "-Dide.browser.jcef.enabled=false"]
 #      --name files-processor-pycharm \
 #      --env DISPLAY=$DISPLAY \
 #      --volume /tmp/.X11-unix:/tmp/.X11-unix \
-#      --volume $(pwd):/opt/processor/ \
+#      --volume $(pwd):/opt/files-processor/ \
 #      --volume files-processor-home:/home/nonroot \
 #      --detach files-processor:pycharm
 
@@ -384,22 +384,22 @@ FROM final_app_image
 
 # CORRER OPERACIONALMENTE CON CRON
 # docker run --name files-processor \
-#        --volume /data/acc-cpt/output:/opt/processor/descriptor_files/cpt-output \
-#        --volume /data/acc-cpt/input/predictands:/opt/processor/descriptor_files/cpt-obs-data \
-#        --volume /data/acc-cpt/input/predictors:/opt/processor/descriptor_files/cpt-predictors \
-#        --volume /data/ereg/generados/nmme_output:/opt/processor/descriptor_files/ereg-output \
+#        --volume /data/acc-cpt/output:/opt/files-processor/descriptor_files/cpt-output \
+#        --volume /data/acc-cpt/input/predictands:/opt/files-processor/descriptor_files/cpt-obs-data \
+#        --volume /data/acc-cpt/input/predictors:/opt/files-processor/descriptor_files/cpt-predictors \
+#        --volume /data/ereg/generados/nmme_output:/opt/files-processor/descriptor_files/ereg-output \
 #        --detach files-processor:latest
 
 # CORRER MANUALMENTE
 # docker run --name files-processor --rm \
-#        --volume /data/acc-cpt/output:/opt/processor/descriptor_files/cpt-output \
-#        --volume /data/acc-cpt/input/predictands:/opt/processor/descriptor_files/cpt-obs-data \
-#        --volume /data/acc-cpt/input/predictors:/opt/processor/descriptor_files/cpt-predictors \
-#        --volume /data/ereg/generados/nmme_output:/opt/processor/descriptor_files/ereg-output \
-#        --detach files-processor:latest /usr/local/bin/python /opt/processor/main.py
+#        --volume /data/acc-cpt/output:/opt/files-processor/descriptor_files/cpt-output \
+#        --volume /data/acc-cpt/input/predictands:/opt/files-processor/descriptor_files/cpt-obs-data \
+#        --volume /data/acc-cpt/input/predictors:/opt/files-processor/descriptor_files/cpt-predictors \
+#        --volume /data/ereg/generados/nmme_output:/opt/files-processor/descriptor_files/ereg-output \
+#        --detach files-processor:latest /usr/local/bin/python /opt/files-processor/main.py
 
 # CORRER ARCHIVOS DE PRUEBA MANUALMENTE
 # docker run --name files-processor --rm \
-#        --volume $(pwd)/descriptor_files:/opt/processor/descriptor_files \
-#        --volume $(pwd)/config.yaml:/opt/processor/config.yaml \
-#        --detach files-processor:latest /usr/local/bin/python /opt/processor/main.py
+#        --volume $(pwd)/descriptor_files:/opt/files-processor/descriptor_files \
+#        --volume $(pwd)/config.yaml:/opt/files-processor/config.yaml \
+#        --detach files-processor:latest /usr/local/bin/python /opt/files-processor/main.py
