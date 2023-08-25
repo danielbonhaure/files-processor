@@ -1,17 +1,27 @@
 
+##################################################################
+##                           README                             ##
+##################################################################
+## Este Dockerfile permite crear un contendor con todos los pa- ##
+## quetes y todas las configuraciones necesarias para procesar  ##
+## los pronósticos calibrados con PyCPT y EREG. El procesamien- ##
+## implica tranformar archivos de salida al formato NetCDF.     ##
+##################################################################
+
+
 
 ##########################
 ## Set GLOBAL arguments ##
 ##########################
 
 # Set python version
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION="3.10"
 
-# Set APP installation folder
-ARG APP_HOME=/opt/files-processor
+# Set FPROC HOME
+ARG FPROC_HOME="/opt/files-processor"
 
 # App data folder
-ARG APP_DATA=/data/files-processor
+ARG FPROC_DATA="/data/files-processor"
 
 # Set user name and id
 ARG USR_NAME="nonroot"
@@ -29,7 +39,7 @@ ARG USER_PWD=$USR_NAME
 ARG CRON_TIME_STR="0 0 18 * *"
 
 # Set Pycharm version
-ARG PYCHARM_VERSION=2023.1
+ARG PYCHARM_VERSION="2023.1"
 
 
 
@@ -88,14 +98,132 @@ RUN python3 -m pip install --upgrade pip && \
 
 
 
+#################################
+## Stage 3: Create FPROC image ##
+#################################
+
+# Create FPROC image
+FROM py_final AS fproc_builder
+
+# Set environment variables
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Renew FPROC_HOME
+ARG FPROC_HOME
+
+# Create FPROC_HOME folder
+RUN mkdir -p FPROC_HOME
+
+# Copy project
+COPY . $FPROC_HOME
+
+# Create input and output folders (these folders are too big so they must be used them as volumes)
+RUN mkdir -p $FPROC_HOME/descriptor_files
+
+
+
+###########################################
+## Stage 4: Install management packages  ##
+###########################################
+
+# Create image
+FROM fproc_builder AS fproc_mgmt
+
+# Set environment variables
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install OS packages
+RUN apt-get -y -qq update && \
+    apt-get -y -qq upgrade && \
+    apt-get -y -qq --no-install-recommends install \
+        # install Tini (https://github.com/krallin/tini#using-tini)
+        tini \
+        # to see process with pid 1
+        htop procps \
+        # to allow edit files
+        vim \
+        # to run process with cron
+        cron && \
+    rm -rf /var/lib/apt/lists/*
+
+# Setup cron to allow it run as a non root user
+RUN chmod u+s $(which cron)
+
+# Add Tini (https://github.com/krallin/tini#using-tini)
+ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
+
+
+
+######################################
+## Stage 5: Setup FPROC core image  ##
+######################################
+
+# Create image
+FROM fproc_mgmt AS fproc-core
+
+# Set environment variables
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Renew FPROC_HOME
+ARG FPROC_HOME
+
+# Renew CRON ARGs
+ARG CRON_TIME_STR
+
+# Set environment variables
+ENV CRON_TIME_STR=${CRON_TIME_STR}
+
+# Crear archivo de configuración de CRON
+RUN printf "\n\
+# Setup cron to run files processor \n\
+${CRON_TIME_STR} /usr/local/bin/python ${FPROC_HOME}/main.py >> /proc/1/fd/1 2>> /proc/1/fd/1\n\
+\n" > ${FPROC_HOME}/crontab.txt
+RUN chmod a+rw ${FPROC_HOME}/crontab.txt
+
+# Setup CRON for root user
+RUN (cat ${FPROC_HOME}/crontab.txt) | crontab -
+
+# Crear script de inicio.
+RUN printf "#!/bin/bash \n\
+set -e \n\
+\n\
+# Reemplazar tiempo ejecución automática del procesador de archivos \n\
+crontab -l | sed \"/main.py/ s|^\S* \S* \S* \S* \S*|\$CRON_TIME_STR|g\" | crontab - \n\
+\n\
+# Ejecutar cron \n\
+cron -fL 15 \n\
+\n" > /startup.sh
+RUN chmod a+x /startup.sh
+
+# Crear script para verificar salud del contendor
+RUN printf "#!/bin/bash\n\
+if [ \$(ls /tmp/files-processor.pid 2>/dev/null | wc -l) != 0 ] && \n\
+   [ \$(ps | grep main.py | wc -l) == 0 ] \n\
+then \n\
+  exit 1 \n\
+else \n\
+  exit 0 \n\
+fi \n\
+\n" > /check-healthy.sh
+RUN chmod a+x /check-healthy.sh
+
+# Run your program under Tini (https://github.com/krallin/tini#using-tini)
+CMD [ "bash", "-c", "/startup.sh" ]
+# or docker run your-image /your/program ...
+
+# Verificar si hubo alguna falla en la ejecución del replicador
+HEALTHCHECK --interval=3s --timeout=3s --retries=3 CMD bash /check-healthy.sh
+
+
+
 ###################################
-## Stage 3: Create non-root user ##
+## Stage 6: Create non-root user ##
 ###################################
 
 # Create image
-FROM py_final AS non_root
+FROM fproc-core AS fproc_nonroot_builder
 
-# Renew ARGs
+# Renew USER ARGs
 ARG USR_NAME
 ARG USER_UID
 ARG GRP_NAME
@@ -139,122 +267,28 @@ RUN usermod -aG sudo $USR_NAME && \
 
 
 
-###########################################
-## Stage 4: Install management packages  ##
-###########################################
-
-# Create image
-FROM non_root AS base_builder
-
-# Set environment variables
-ARG DEBIAN_FRONTEND=noninteractive
-
-# Install OS packages
-RUN apt-get -y -qq update && \
-    apt-get -y -qq upgrade && \
-    apt-get -y -qq --no-install-recommends install \
-        # install Tini (https://github.com/krallin/tini#using-tini)
-        tini \
-        # to see process with pid 1
-        htop \
-        # to allow edit files
-        vim \
-        # to run process with cron
-        cron && \
-    rm -rf /var/lib/apt/lists/*
-
-# Setup cron to allow it run as a non root user
-RUN chmod u+s $(which cron)
-
-# Add Tini (https://github.com/krallin/tini#using-tini)
-ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
-
-
-
-####################################
-## Stage 5: Install and setup APP ##
-####################################
-
-# Create image
-FROM base_builder AS app_builder
-
-# Set environment variables
-ARG DEBIAN_FRONTEND=noninteractive
-
-# Renew ARGs
-ARG APP_HOME
-ARG APP_DATA
-ARG USR_NAME
-ARG GRP_NAME
-
-# Renew CRON ARGs
-ARG CRON_TIME_STR
-
-# Create APP_HOME folder and change its owner
-RUN mkdir -p $APP_HOME && chown -R $USR_NAME:$GRP_NAME $APP_HOME
-
-# Copy project
-COPY --chown=$USR_NAME:$GRP_NAME . $APP_HOME
-
-# Create input and output folders (these folders are too big so they must be used them as volumes)
-RUN mkdir -p $APP_HOME/descriptor_files
-
-# Crear archivo de configuración de CRON
-RUN printf "\n\
-# Setup cron to run files processor \n\
-${CRON_TIME_STR} /usr/local/bin/python ${APP_HOME}/main.py >> /proc/1/fd/1 2>> /proc/1/fd/1\n\
-\n" > /tmp/crontab.txt
-
-# Crear script para verificar salud del contendor
-RUN printf "#!/bin/bash\n\
-if [ \$(ls /tmp/files-processor.pid 2>/dev/null | wc -l) != 0 ] && \n\
-   [ \$(ps | grep main.py | wc -l) == 0 ] \n\
-then \n\
-  exit 1 \n\
-else \n\
-  exit 0 \n\
-fi \n\
-\n" > /check-healthy.sh
-RUN chmod a+x /check-healthy.sh
-
-# Definir variables de entorno para el contendor final
-ENV CRON_TIME_STR=${CRON_TIME_STR}
-
-# Crear script de inicio.
-RUN printf "#!/bin/bash \n\
-set -e \n\
-\n\
-# Reemplazar tiempo ejecución automática del procesador de archivos \n\
-crontab -l | sed \"/main.py/ s|^\S* \S* \S* \S* \S*|\$CRON_TIME_STR|g\" | crontab - \n\
-\n\
-# Ejecutar cron \n\
-cron -fL 15 \n\
-\n" > /startup.sh
-RUN chmod a+x /startup.sh
-
-
-
 ############################################
-## Stage 6.1: Install Pycharm (for debug) ##
+## Stage 7.1: Install Pycharm (for debug) ##
 ############################################
 
 # Create image
-FROM app_builder AS pycharm
-
-# Renew ARGs
-ARG APP_HOME
-ARG USR_NAME
-ARG GRP_NAME
+FROM fproc_nonroot_builder AS fproc-pycharm
 
 # Become root
 USER root
+
+# Renew FPROC_HOME
+ARG FPROC_HOME
+
+# Renew USER ARGs
+ARG USR_NAME
+ARG GRP_NAME
 
 # Updata apt cache and install wget
 RUN apt-get -y -qq update && \
     apt-get -y -qq upgrade && \
     apt-get -y -qq --no-install-recommends install \
-        wget  \
-        git
+        curl wget git
 
 # Renew ARGs
 ARG PYCHARM_VERSION
@@ -273,7 +307,7 @@ RUN count=$(ls /tmp/pycharm-*.tar.gz | wc -l) && [ $count = 1 ] \
         libcups2 libatspi2.0-0 libxshmfence1 \
         # Without this packages, PyCharm start, but shows errors when running
         procps libsecret-1-0 gnome-keyring libxss1 libxext6 firefox-esr \
-	#libnss3 libxext-dev libnspr4 \
+        #libnss3 libxext-dev libnspr4 \
     || :  # para entender porque :, ver https://stackoverflow.com/a/49348392/5076110
 
 # Install PyCharm IDE
@@ -297,54 +331,64 @@ RUN mkdir -p /usr/local/lib/python${PYTHON_VERSION}/dist-packages \
 USER $USR_NAME
 
 # Set work directory
-WORKDIR $APP_HOME
+WORKDIR $FPROC_HOME
 
 # Run pycharm under Tini (https://github.com/krallin/tini#using-tini)
 CMD ["sh", "/opt/pycharm/bin/pycharm.sh", "-Dide.browser.jcef.enabled=false"]
 # or docker run your-image /your/program ...
 
 
+#
 # Ejecución de pycharm:
 #
-# 1- docker volume create files-processor-home
+# 1- docker volume create fproc-home
 #
 # 2- export DOCKER_BUILDKIT=1
 #
 # 3- docker build --force-rm \
-#      --target pycharm \
-#      --tag files-processor:pycharm \
+#      --target fproc-pycharm \
+#      --tag fproc-pycharm:latest \
 #      --build-arg USER_UID=$(stat -c "%u" .) \
 #      --build-arg USER_GID=$(stat -c "%g" .) \
 #      --file dockerfile .
 #
 # 4- docker run -ti --rm \
-#      --name files-processor-pycharm \
+#      --name fproc-pycharm \
 #      --env DISPLAY=$DISPLAY \
 #      --volume /tmp/.X11-unix:/tmp/.X11-unix \
+#      --volume fproc-home:/home/nonroot \
 #      --volume $(pwd):/opt/files-processor/ \
-#      --volume files-processor-home:/home/nonroot \
-#      --detach files-processor:pycharm
+#      --detach fproc-pycharm:latest
+#
 
 
 
 ##############################################
-## Stage 6.2: Setup and run final APP image ##
+## Stage 7.2: Setup and run final APP image ##
 ##############################################
 
 # Create image
-FROM app_builder AS final_app_image
+FROM fproc_nonroot_builder AS fproc-nonroot
 
 # Become root
 USER root
 
-# Renew the ARG
+# Renew FPROC_HOME
+ARG FPROC_HOME
+
+# Renew USER ARGs
 ARG USR_NAME
+ARG USER_UID
+ARG USER_GID
+
+# Change files owner
+RUN chown -R $USER_UID:$USER_GID $FPROC_HOME
 
 # Setup cron to allow it run as a non root user
 RUN chmod u+s $(which cron)
 
 # Setup cron
-RUN (cat /tmp/crontab.txt) | crontab -u $USR_NAME -
+RUN (cat $FPROC_HOME/crontab.txt) | crontab -u $USR_NAME -
 
 # Add Tini (https://github.com/krallin/tini#using-tini)
 ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
@@ -363,20 +407,23 @@ WORKDIR /home/$USR_NAME
 USER $USR_NAME
 
 
-
-####################################
-## Stage 7: Set the DEFAULT image ##
-####################################
-
-FROM final_app_image
-
-
-
-# CONSTRUIR CONTENEDOR
+# Activar docker build kit
 # export DOCKER_BUILDKIT=1
+
+# CONSTRUIR IMAGEN (CORE)
 # docker build --force-rm \
-#   --target final_app_image \
-#   --tag files-processor:latest \
+#   --target fproc-core \
+#   --tag ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0 \
+#   --build-arg CRON_TIME_STR="0 0 18 * *" \
+#   --file dockerfile .
+
+# LEVANTAR IMAGEN A GHCR
+# docker push ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0
+
+# CONSTRUIR IMAGEN (NON-ROOT)
+# docker build --force-rm \
+#   --target fproc-nonroot \
+#   --tag fproc-nonroot:latest \
 #   --build-arg USER_UID=$(stat -c "%u" .) \
 #   --build-arg USER_GID=$(stat -c "%g" .) \
 #   --build-arg CRON_TIME_STR="0 0 18 * *" \
@@ -384,22 +431,22 @@ FROM final_app_image
 
 # CORRER OPERACIONALMENTE CON CRON
 # docker run --name files-processor \
-#        --volume /data/acc-cpt/output:/opt/files-processor/descriptor_files/cpt-output \
-#        --volume /data/acc-cpt/input/predictands:/opt/files-processor/descriptor_files/cpt-obs-data \
-#        --volume /data/acc-cpt/input/predictors:/opt/files-processor/descriptor_files/cpt-predictors \
-#        --volume /data/ereg/generados/nmme_output:/opt/files-processor/descriptor_files/ereg-output \
-#        --detach files-processor:latest
+#   --volume /data/acc-cpt/output:/opt/files-processor/descriptor_files/cpt-output \
+#   --volume /data/acc-cpt/input/predictands:/opt/files-processor/descriptor_files/cpt-obs-data \
+#   --volume /data/acc-cpt/input/predictors:/opt/files-processor/descriptor_files/cpt-predictors \
+#   --volume /data/ereg/generados/nmme_output:/opt/files-processor/descriptor_files/ereg-output \
+#   --detach fproc-nonroot:latest
 
 # CORRER MANUALMENTE
-# docker run --name files-processor --rm \
-#        --volume /data/acc-cpt/output:/opt/files-processor/descriptor_files/cpt-output \
-#        --volume /data/acc-cpt/input/predictands:/opt/files-processor/descriptor_files/cpt-obs-data \
-#        --volume /data/acc-cpt/input/predictors:/opt/files-processor/descriptor_files/cpt-predictors \
-#        --volume /data/ereg/generados/nmme_output:/opt/files-processor/descriptor_files/ereg-output \
-#        --detach files-processor:latest /usr/local/bin/python /opt/files-processor/main.py
+# docker run --name files-processor \
+#   --volume /data/acc-cpt/output:/opt/files-processor/descriptor_files/cpt-output \
+#   --volume /data/acc-cpt/input/predictands:/opt/files-processor/descriptor_files/cpt-obs-data \
+#   --volume /data/acc-cpt/input/predictors:/opt/files-processor/descriptor_files/cpt-predictors \
+#   --volume /data/ereg/generados/nmme_output:/opt/files-processor/descriptor_files/ereg-output \
+#   --rm fproc-nonroot:latest /usr/local/bin/python /opt/files-processor/main.py
 
 # CORRER ARCHIVOS DE PRUEBA MANUALMENTE
-# docker run --name files-processor --rm \
-#        --volume $(pwd)/descriptor_files:/opt/files-processor/descriptor_files \
-#        --volume $(pwd)/config.yaml:/opt/files-processor/config.yaml \
-#        --detach files-processor:latest /usr/local/bin/python /opt/files-processor/main.py
+# docker run --name files-processor \
+#   --volume $(pwd)/descriptor_files:/opt/files-processor/descriptor_files \
+#   --volume $(pwd)/config.yaml:/opt/files-processor/config.yaml \
+#   --rm fproc-nonroot:latest /usr/local/bin/python /opt/files-processor/main.py
