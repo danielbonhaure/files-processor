@@ -20,9 +20,6 @@ ARG PYTHON_VERSION="3.10"
 # Set FPROC HOME
 ARG FPROC_HOME="/opt/files-processor"
 
-# App data folder
-ARG FPROC_DATA="/data/files-processor"
-
 # Set user name and id
 ARG USR_NAME="nonroot"
 ARG USER_UID="1000"
