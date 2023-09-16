@@ -195,7 +195,7 @@ RUN chmod a+x /startup.sh
 # Crear script para verificar salud del contendor
 RUN printf "#!/bin/bash\n\
 if [ \$(ls /tmp/files-processor.pid 2>/dev/null | wc -l) != 0 ] && \n\
-   [ \$(ps -ef | grep main.py | wc -l) == 0 ] \n\
+   [ \$(ps -ef | grep 'main.py' | grep -v 'grep' | wc -l) == 0 ] \n\
 then \n\
   exit 1 \n\
 else \n\
