@@ -167,6 +167,9 @@ ARG FPROC_HOME
 # Renew CRON ARGs
 ARG CRON_TIME_STR
 
+# Set read-only environment variables
+ENV FPROC_HOME=${FPROC_HOME}
+
 # Set environment variables
 ENV CRON_TIME_STR=${CRON_TIME_STR}
 
