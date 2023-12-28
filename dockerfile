@@ -117,6 +117,18 @@ COPY . $FPROC_HOME
 # Create input and output folders (these folders are too big so they must be used them as volumes)
 RUN mkdir -p $FPROC_HOME/descriptor_files
 
+# Save Git commit hash of this build into ${FPROC_HOME}/repo_version.
+# https://github.com/docker/hub-feedback/issues/600#issuecomment-475941394
+# https://docs.docker.com/build/building/context/#keep-git-directory
+COPY ./.git /tmp/git
+RUN export head=$(cat /tmp/git/HEAD | cut -d' ' -f2) && \
+    if echo "${head}" | grep -q "refs/heads"; then \
+    export hash=$(cat /tmp/git/${head}); else export hash=${head}; fi && \
+    echo "${hash}" > ${FPROC_HOME}/repo_version && rm -rf /tmp/git
+
+# Set permissions of app files
+RUN chmod -R ug+rw,o+r $FPROC_HOME
+
 
 
 ###########################################
