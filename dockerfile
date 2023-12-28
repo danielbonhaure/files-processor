@@ -112,13 +112,8 @@ ARG FPROC_HOME
 RUN mkdir -p ${FPROC_HOME}
 
 # Copy project
-COPY ./config.yaml ${FPROC_HOME}
-COPY ./configuration.py ${FPROC_HOME}
-COPY ./errors.py ${FPROC_HOME}
-COPY ./helpers.py ${FPROC_HOME}
-COPY ./read_strategies.py ${FPROC_HOME}
-COPY ./singleton.py ${FPROC_HOME}
-COPY ./main.py ${FPROC_HOME}
+COPY *.yaml ${FPROC_HOME}
+COPY *.py ${FPROC_HOME}
 
 # Create input and output folders (these folders are too big so they must be used them as volumes)
 RUN mkdir -p ${FPROC_HOME}/descriptor_files
