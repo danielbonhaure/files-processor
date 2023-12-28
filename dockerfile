@@ -109,13 +109,13 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG FPROC_HOME
 
 # Create FPROC_HOME folder
-RUN mkdir -p FPROC_HOME
+RUN mkdir -p ${FPROC_HOME}
 
 # Copy project
-COPY . $FPROC_HOME
+COPY . ${FPROC_HOME}
 
 # Create input and output folders (these folders are too big so they must be used them as volumes)
-RUN mkdir -p $FPROC_HOME/descriptor_files
+RUN mkdir -p ${FPROC_HOME}/descriptor_files
 
 # Save Git commit hash of this build into ${FPROC_HOME}/repo_version.
 # https://github.com/docker/hub-feedback/issues/600#issuecomment-475941394
@@ -127,7 +127,7 @@ RUN export head=$(cat /tmp/git/HEAD | cut -d' ' -f2) && \
     echo "${hash}" > ${FPROC_HOME}/repo_version && rm -rf /tmp/git
 
 # Set permissions of app files
-RUN chmod -R ug+rw,o+r $FPROC_HOME
+RUN chmod -R ug+rw,o+r ${FPROC_HOME}
 
 
 
