@@ -629,7 +629,7 @@ class ReadEREGoutputDET(ReadStrategy):
                         #      de la corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a
                         #      diferencia de lo que pasa con los archivos de salida del CPT, aquí sí se puede usar
                         #      directamente el año.
-                        'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
+                        'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MES'),
                         'latitude': npz['lat'],
                         'longitude': npz['lon']
                     })
@@ -745,7 +745,7 @@ class ReadEREGoutputPROB(ReadStrategy):
                         #      de la corrida y no el año del primer mes objetivo del pronóstico. Por lo tanto, a
                         #      diferencia de lo que pasa con los archivos de salida del CPT, aquí sí se puede usar
                         #      directamente el año.
-                        'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MS'),
+                        'init_time': pd.date_range(f"{first_year}-{forecast_month}-01", periods=n_years, freq='12MES'),
                         'latitude': npz['lat'],
                         'longitude': npz['lon'],
                         'category': ['below', 'normal', 'above']
@@ -896,7 +896,7 @@ class ReadEREGobservedData(ReadStrategy):
                     file_variable: (['init_time', 'latitude', 'longitude'], np.squeeze(npz['obs_3m'][:, :, :]))
                 },
                 coords={
-                    'init_time': pd.date_range(f"{first_year}-{first_month}-01", periods=n_years, freq='12MS'),
+                    'init_time': pd.date_range(f"{first_year}-{first_month}-01", periods=n_years, freq='12MES'),
                     'latitude': npz['lats_obs'],
                     'longitude': npz['lons_obs']
                 })
