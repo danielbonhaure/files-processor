@@ -3,3 +3,4 @@ pandas
 xarray
 PyYAML
 netCDF4
+redis[hiredis]

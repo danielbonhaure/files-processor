@@ -182,6 +182,14 @@ ARG FPROC_HOME
 # Renew CRON ARGs
 ARG CRON_TIME_STR
 
+# Install OS packages
+RUN apt-get -y -qq update && \
+    apt-get -y -qq upgrade && \
+    apt-get -y -qq --no-install-recommends install \
+        # to check container health
+        redis-tools && \
+    rm -rf /var/lib/apt/lists/*
+
 # Set read-only environment variables
 ENV FPROC_HOME=${FPROC_HOME}
 
@@ -212,8 +220,9 @@ RUN chmod a+x /startup.sh
 
 # Crear script para verificar salud del contendor
 RUN printf "#!/bin/bash\n\
-if [ \$(ls /tmp/files-processor.pid 2>/dev/null | wc -l) != 0 ] && \n\
-   [ \$(ps -ef | grep 'main.py' | grep -v 'grep' | wc -l) == 0 ] \n\
+if [ \$(find ${FPROC_HOME} -type f -name '*.pid' 2>/dev/null | wc -l) != 0 ] || \n\
+   [ \$(echo 'KEYS *' | redis-cli -h \${REDIS_HOST} 2>/dev/null | grep -c files-processor) != 0 ] && \n\
+   [ \$(ps -ef | grep -v 'grep' | grep -c 'python' | wc -l) == 0 ] \n\
 then \n\
   exit 1 \n\
 else \n\
