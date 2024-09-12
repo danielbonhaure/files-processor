@@ -9,6 +9,7 @@ if os.path.dirname(__file__):
 
 from pathlib import Path
 
+from script import ScriptControl
 from errors import DescriptorError
 from configuration import ConfigFile, DescriptorFile
 from read_strategies import FileReader
