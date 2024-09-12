@@ -187,8 +187,15 @@ RUN apt-get -y -qq update && \
     apt-get -y -qq upgrade && \
     apt-get -y -qq --no-install-recommends install \
         # to check container health
-        redis-tools && \
+        redis-tools \
+        # to configure locale
+        locales && \
     rm -rf /var/lib/apt/lists/*
+
+# Configure Locale en_US.UTF-8
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
+    sed -i -e 's/# es_US.UTF-8 UTF-8/es_US.UTF-8 UTF-8/' /etc/locale.gen && \
+    dpkg-reconfigure --frontend=noninteractive locales
 
 # Set read-only environment variables
 ENV FPROC_HOME=${FPROC_HOME}
