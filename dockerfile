@@ -15,7 +15,7 @@
 ##########################
 
 # Set python version
-ARG PYTHON_VERSION="3.10"
+ARG PYTHON_VERSION="3.12"
 
 # Set FPROC HOME
 ARG FPROC_HOME="/opt/files-processor"
