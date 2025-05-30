@@ -133,7 +133,7 @@ class DescFilesSelector(object):
         # Buscar descriptores para los distintos leadtimes (pronos trimestrales)
         for first_fcst_month in nrange(self.target_month, 6, 12):
 
-            last_fcst_month = Mpro.add_months(first_fcst_month, 3)
+            last_fcst_month = Mpro.add_months(first_fcst_month, 2)
 
             # Definir el patrón de búsqueda (predictands)
             rglob_pattern = f'*_{first_fcst_month}-{last_fcst_month}.yaml'
