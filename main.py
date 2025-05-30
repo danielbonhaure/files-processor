@@ -31,15 +31,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--overwrite', action='store_true', dest='overwrite_output',
         help='Indicates if previously generated files should be overwritten or not.')
 
-    parsed_args = parser.parse_args()
+    args = parser.parse_args()
 
-    if parsed_args.year and not parsed_args.month or not parsed_args.year and parsed_args.month:
+    if args.year and not args.month or not args.year and args.month:
         parser.error('Arguments --year and --month are mutually inclusive!')
 
-    if parsed_args.overwrite_output and not parsed_args.year and not parsed_args.month:
+    if args.overwrite_output and not args.year and not args.month:
         parser.error('You cannot overwrite outputs without specifying a year and month!')
 
-    return parsed_args
+    return args
 
 
 def define_read_strategy(file_type: str, descriptor_filename: str):
@@ -124,6 +124,9 @@ if __name__ == '__main__':
             # Si el archivo ya existe y no debe ser sobrescrito, no se deben ejecutar las líneas a continuación
             if not reader.output_file_must_be_created(pf):
                 continue
+
+            # Reportar archivo a ser procesado (solo en modo debug)
+            logging.debug(input_file)
 
             # Convertir archivo a NetCDF
             reader.convert_file_to_netcdf(desc_file=pf)

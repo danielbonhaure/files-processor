@@ -100,7 +100,7 @@ class DescFilesSelector(object):
         desc_files: list[Path] = []
 
         # Buscar descriptores para los distintos leadtimes (pronos mensuales)
-        for fcst_month in nrange(self.target_month, 6, 12):
+        for fcst_month in nrange(self.target_month+1, 5, 12):
 
             # Definir el patrón de búsqueda (predictands)
             rglob_pattern = f'*_{fcst_month}.yaml'
@@ -135,7 +135,7 @@ class DescFilesSelector(object):
         desc_files: list[Path] = []
 
         # Buscar descriptores para los distintos leadtimes (pronos trimestrales)
-        for first_fcst_month in nrange(self.target_month, 6, 12):
+        for first_fcst_month in nrange(self.target_month+1, 5, 12):
 
             last_fcst_month = Mpro.add_months(first_fcst_month, 2)
 
