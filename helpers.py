@@ -1,6 +1,6 @@
 
 from contextlib import contextmanager
-from itertools import chain
+from itertools import chain, repeat
 from dataclasses import dataclass
 from typing import Union
 from datetime import datetime
@@ -22,10 +22,30 @@ def localized(new_locale):
 
 
 def crange(start, stop, modulo):
+    # Verificar argumentos
+    if start > modulo:
+        raise ValueError('Wrong arguments (start cannot be greater than modulo)')
+    if stop > modulo:
+        raise ValueError('Wrong arguments (stop cannot be greater than modulo)')
+    # Ejecutar función
     if start > stop:
         return chain(range(start, modulo+1), range(1, stop))
     else:
         return range(start, stop)
+
+
+def nrange(start, n_steps, modulo):
+    # Verificar argumentos
+    if start > modulo:
+        raise ValueError('Wrong arguments (start cannot be greater than modulo)')
+    # Ejecutar función
+    values, last_value = [start], start
+    for _ in repeat(None, n_steps): # Cycles n_steps times
+        last_value = last_value + 1
+        if last_value > 12:
+            last_value = last_value - 12
+        values = values + [last_value]
+    return values
 
 
 class MonthsProcessor:
@@ -45,6 +65,11 @@ class MonthsProcessor:
     @classmethod
     def month_int_to_abbr(cls, month: int) -> str:
         return cls.months_abbr[month]
+
+    @classmethod
+    def add_months(cls, month: int, months_to_add: int):
+        result = (month + months_to_add) % 12
+        return result if result != 0 else 12
 
     @classmethod
     def n_days_in_trimester(cls, trimester: str, isleap: bool = False) -> int:
@@ -72,6 +97,7 @@ class MonthsProcessor:
             return calendar.mdays[11] + calendar.mdays[12] + calendar.mdays[1]
         elif trimester == 'DJF':
             return calendar.mdays[12] + calendar.mdays[1] + calendar.mdays[2] + 1 if isleap else 0
+        return 0
 
     @classmethod
     def first_month_of_trimester(cls, trimester: str) -> int:
@@ -99,6 +125,7 @@ class MonthsProcessor:
             return 11
         elif trimester == 'DJF':
             return 12
+        return 0
 
     @classmethod
     def n_days_in_months(cls, fcst_year: int, fcst_month: int, trgt_months: List[int]) -> int:

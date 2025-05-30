@@ -77,13 +77,13 @@ class FileReader(object):
     def output_file_must_be_created(self, desc_file: dict = None) -> bool:
         # Leer configuración del script
         config = ConfigFile.Instance()
-        # Si el archivo de salida no existe, debe ser creado
+        # Si el archivo de salida no existe, el archivo de salida deber ser creado
         if not os.path.exists(self.define_output_filename(desc_file)):
             return True
-        # Si la configuración del script indica que todos los archivos de salida deben ser creados, debe ser creado
-        if config.get('force_output_update', False) is True:
+        # Si en la configuración así se indica, el archivo de salida deber ser creado
+        if config.get('overwrite_output', False) is True:
             return True
-        # Si el descriptor indica que el archivo de salida debe ser creado, deber ser creado
+        # Si el descriptor así lo indica, el archivo de salida deber ser creado
         if desc_file.get('update_output', False) is True:
             return True
         # En cualquier otro caso, el archivo de salida no debe ser creado

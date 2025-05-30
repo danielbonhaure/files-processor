@@ -1,7 +1,5 @@
 
 log_level: "INFO"
 
-force_output_update: !!bool False
-
 folders:
   descriptor_files: "./descriptor_files"

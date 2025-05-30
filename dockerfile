@@ -36,7 +36,7 @@ ARG USER_PWD=$USR_NAME
 ARG CRON_TIME_STR="0 0 18 * *"
 
 # Set Pycharm version
-ARG PYCHARM_VERSION="2023.1"
+ARG PYCHARM_VERSION="2025.1"
 
 
 
@@ -365,7 +365,7 @@ USER $USR_NAME
 WORKDIR $FPROC_HOME
 
 # Run pycharm under Tini (https://github.com/krallin/tini#using-tini)
-CMD ["sh", "/opt/pycharm/bin/pycharm.sh", "-Dide.browser.jcef.enabled=false"]
+CMD ["/opt/pycharm/bin/pycharm", "-Dide.browser.jcef.enabled=false"]
 # or docker run your-image /your/program ...
 
 
@@ -383,7 +383,9 @@ CMD ["sh", "/opt/pycharm/bin/pycharm.sh", "-Dide.browser.jcef.enabled=false"]
 #      --build-arg USER_GID=$(stat -c "%g" .) \
 #      --file dockerfile .
 #
-# 4- docker run -ti --rm \
+# 4- xhost +SI:localuser:"$(id -un)"
+#
+# 5- docker run -ti --rm \
 #      --name fproc-pycharm \
 #      --env DISPLAY=$DISPLAY \
 #      --volume /tmp/.X11-unix:/tmp/.X11-unix \

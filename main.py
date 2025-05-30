@@ -2,20 +2,44 @@
 
 import os
 import logging
+import argparse
+
+from datetime import datetime
 
 # Change current directory
 if os.path.dirname(__file__):
     os.chdir(os.path.dirname(__file__))
 
-from pathlib import Path
-
 from script import ScriptControl
 from errors import DescriptorError
-from configuration import ConfigFile, DescriptorFile
+from configuration import ConfigFile, DescriptorFile, DescFilesSelector
 from read_strategies import FileReader
 from read_strategies import ReadEREGoutputDET, ReadEREGoutputPROB, ReadEREGoutputSISSA, ReadEREGobservedData
 from read_strategies import ReadCPToutputDET, ReadCPToutputPROB, ReadCPTpredictand, ReadCPTpredictor
 from read_strategies import ReadCRCSASobs
+
+
+def parse_args() -> argparse.Namespace:
+
+    now = datetime.now()
+
+    parser = argparse.ArgumentParser(description='Run Files Processor')
+    parser.add_argument('--year', type=int, default=now.year, dest='year',
+        help='Indicates the YEAR that should be considered by the files processor.')
+    parser.add_argument('--month', type=int, default=now.month, dest='month',
+        help='Indicates the MONTH that should be considered by the files processor.')
+    parser.add_argument('--overwrite', action='store_true', dest='overwrite_output',
+        help='Indicates if previously generated files should be overwritten or not.')
+
+    parsed_args = parser.parse_args()
+
+    if parsed_args.year and not parsed_args.month or not parsed_args.year and parsed_args.month:
+        parser.error('Arguments --year and --month are mutually inclusive!')
+
+    if parsed_args.overwrite_output and not parsed_args.year and not parsed_args.month:
+        parser.error('You cannot overwrite outputs without specifying a year and month!')
+
+    return parsed_args
 
 
 def define_read_strategy(file_type: str, descriptor_filename: str):
@@ -44,6 +68,9 @@ def define_read_strategy(file_type: str, descriptor_filename: str):
 
 if __name__ == '__main__':
 
+    # Catch and parse command-line arguments
+    parsed_args: argparse.Namespace = parse_args()
+
     # Create script control
     script = ScriptControl('files-processor')
 
@@ -52,16 +79,21 @@ if __name__ == '__main__':
 
     # Read processor config file
     config = ConfigFile.Instance()
-    desc_files_folder = config.get('folders').get('descriptor_files')
 
-    # Obtener listado de archivos de configuración
-    desc_files = sorted(Path(desc_files_folder).rglob("*.yaml"))
-    desc_files = [f for f in desc_files if f.name != 'template.yaml']
+    # Save overwrite_output arg to the global configuration
+    config.set('overwrite_output', parsed_args.overwrite_output)
 
-    # Procesar cada uno de los archivos de configuración
+    # Crear objeto para seleccionar descriptores a procesar
+    selector = DescFilesSelector(parsed_args.year, parsed_args.month)
+    # Obtener listado de archivos de configuración (descriptores)
+    desc_files = selector.target_descriptors
+
+    # Definir variables para contar archivos procesados
     files_count = 0
     missing_files_count = 0
     processed_files_count = 0
+
+    # Procesar cada uno de los archivos de configuración
     for dn, df in enumerate(desc_files):
 
         # Leer el archivo de configuración
