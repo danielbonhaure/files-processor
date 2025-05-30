@@ -51,8 +51,8 @@ FROM python:${PYTHON_VERSION}-slim AS py_builder
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Set python environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Install OS packages
 RUN apt-get -y -qq update && \
