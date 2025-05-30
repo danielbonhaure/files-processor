@@ -7,6 +7,7 @@ from pathlib import Path
 
 import os
 import yaml
+import logging
 
 
 @Singleton
@@ -84,6 +85,7 @@ class DescFilesSelector(object):
         # Definir el patrón de búsqueda
         target_month_abbr = Mpro.month_int_to_abbr(self.target_month)
         rglob_pattern = f'*_{target_month_abbr}{self.target_year}.yaml'
+        logging.debug(f'rglob_pattern = {rglob_pattern}')
 
         # Obtener listado de archivos de configuración y/o descriptores
         desc_files = sorted(self.target_folder.rglob(rglob_pattern))
@@ -102,6 +104,7 @@ class DescFilesSelector(object):
 
             # Definir el patrón de búsqueda (predictands)
             rglob_pattern = f'*_{fcst_month}.yaml'
+            logging.debug(f'rglob_pattern = {rglob_pattern}')
             # Obtener listado de archivos de configuración y/o descriptores
             c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
             # Agregar descriptores al listado final
@@ -109,11 +112,12 @@ class DescFilesSelector(object):
 
             # Definir año correspondiente a fcst_month
             fcst_year = self.target_year
-            if self.target_month < fcst_month:
+            if self.target_month >= fcst_month:
                 fcst_year = self.target_year + 1
 
             # Definir el patrón de búsqueda (predictors and outputs)
             rglob_pattern = f'*_{self.target_month_abbr}ic_{fcst_month}_*_{fcst_year}_1.yaml'
+            logging.debug(f'rglob_pattern = {rglob_pattern}')
             # Obtener listado de archivos de configuración y/o descriptores
             c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
             # Agregar descriptores al listado final
@@ -137,6 +141,7 @@ class DescFilesSelector(object):
 
             # Definir el patrón de búsqueda (predictands)
             rglob_pattern = f'*_{first_fcst_month}-{last_fcst_month}.yaml'
+            logging.debug(f'rglob_pattern = {rglob_pattern}')
             # Obtener listado de archivos de configuración y/o descriptores
             c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
             # Agregar descriptores al listado final
@@ -156,6 +161,7 @@ class DescFilesSelector(object):
             rglob_pattern = f'*_{self.target_month_abbr}ic_' \
                             f'{first_fcst_month}-{last_fcst_month}_*_' \
                             f'{first_fcst_year}-{last_fcst_year}_1.yaml'
+            logging.debug(f'rglob_pattern = {rglob_pattern}')
             # Obtener listado de archivos de configuración y/o descriptores
             c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
             # Agregar descriptores al listado final
