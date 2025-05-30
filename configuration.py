@@ -112,7 +112,7 @@ class DescFilesSelector(object):
 
             # Definir año correspondiente a fcst_month
             fcst_year = self.target_year
-            if self.target_month >= fcst_month:
+            if self.target_month > fcst_month:
                 fcst_year = self.target_year + 1
 
             # Definir el patrón de búsqueda (predictors and outputs)
@@ -149,12 +149,12 @@ class DescFilesSelector(object):
 
             # Definir año correspondiente a first_fcst_year
             first_fcst_year = self.target_year
-            if self.target_month >= first_fcst_year:
+            if self.target_month > first_fcst_month:
                 first_fcst_year = self.target_year + 1
 
             # Definir año correspondiente a last_fcst_year
             last_fcst_year = self.target_year
-            if self.target_month >= last_fcst_year:
+            if self.target_month > last_fcst_month:
                 last_fcst_year = self.target_year + 1
 
             # Definir el patrón de búsqueda (predictors and outputs)
