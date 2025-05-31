@@ -25,8 +25,8 @@ def crange(start, stop, modulo):
     # Verificar argumentos
     if start > modulo:
         raise ValueError('Wrong arguments (start cannot be greater than modulo)')
-    if stop > modulo:
-        raise ValueError('Wrong arguments (stop cannot be greater than modulo)')
+    if stop > modulo+1:
+        raise ValueError('Wrong arguments (stop cannot be greater than modulo+1)')
     # Ejecutar función
     if start > stop:
         return chain(range(start, modulo+1), range(1, stop))
