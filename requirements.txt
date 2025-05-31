@@ -1,6 +1,6 @@
 numpy
 pandas
-xarray
+xarray != 2025.4.0  # https://github.com/pydata/xarray/issues/10312
 PyYAML
 netCDF4
 redis[hiredis]
