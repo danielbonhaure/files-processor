@@ -67,7 +67,7 @@ RUN python3 -m pip install --upgrade pip && \
 # Create image
 FROM python:${PYTHON_VERSION}-slim AS py_final
 
-# set environment variables
+# Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install OS packages
