@@ -381,7 +381,7 @@ CMD ["/opt/pycharm/bin/pycharm", "-Dide.browser.jcef.enabled=false"]
 #      --tag fproc-pycharm:latest \
 #      --build-arg USER_UID=$(stat -c "%u" .) \
 #      --build-arg USER_GID=$(stat -c "%g" .) \
-#      --file dockerfile .
+#      --file Dockerfile .
 #
 # 4- xhost +SI:localuser:"$(id -un)"
 #
@@ -448,7 +448,7 @@ USER $USR_NAME
 #   --target fproc-core \
 #   --tag ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0 \
 #   --build-arg CRON_TIME_STR="0 0 18 * *" \
-#   --file dockerfile .
+#   --file Dockerfile .
 
 # LEVANTAR IMAGEN A GHCR
 # docker push ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0
@@ -460,7 +460,7 @@ USER $USR_NAME
 #   --build-arg USER_UID=$(stat -c "%u" .) \
 #   --build-arg USER_GID=$(stat -c "%g" .) \
 #   --build-arg CRON_TIME_STR="0 0 18 * *" \
-#   --file dockerfile .
+#   --file Dockerfile .
 
 # CORRER OPERACIONALMENTE CON CRON
 # docker run --name files-processor \
