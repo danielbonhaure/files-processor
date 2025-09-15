@@ -83,12 +83,44 @@ RUN python3 -m pip install --upgrade pip && \
 
 
 
+###########################################
+## Stage 3: Install management packages  ##
+###########################################
+
+# Create image
+FROM py_final AS base_image
+
+# Set environment variables
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install OS packages
+RUN apt-get -y -qq update && \
+    apt-get -y -qq upgrade && \
+    apt-get -y -qq --no-install-recommends install \
+        # install Tini (https://github.com/krallin/tini#using-tini)
+        tini \
+        # to see process with pid 1
+        htop procps \
+        # to allow edit files
+        vim \
+        # to run process with cron
+        cron && \
+    rm -rf /var/lib/apt/lists/*
+
+# Setup cron to allow it run as a non root user
+RUN chmod u+s $(which cron)
+
+# Add Tini (https://github.com/krallin/tini#using-tini)
+ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
+
+
+
 #################################
-## Stage 3: Create FPROC image ##
+## Stage 4: Create FPROC image ##
 #################################
 
 # Create FPROC image
-FROM py_final AS fproc_builder
+FROM base_image AS fproc_builder
 
 # Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
@@ -122,44 +154,12 @@ RUN chmod -R ug+rw,o+r ${FPROC_HOME}
 
 
 
-###########################################
-## Stage 4: Install management packages  ##
-###########################################
-
-# Create image
-FROM fproc_builder AS fproc_mgmt
-
-# Set environment variables
-ARG DEBIAN_FRONTEND=noninteractive
-
-# Install OS packages
-RUN apt-get -y -qq update && \
-    apt-get -y -qq upgrade && \
-    apt-get -y -qq --no-install-recommends install \
-        # install Tini (https://github.com/krallin/tini#using-tini)
-        tini \
-        # to see process with pid 1
-        htop procps \
-        # to allow edit files
-        vim \
-        # to run process with cron
-        cron && \
-    rm -rf /var/lib/apt/lists/*
-
-# Setup cron to allow it run as a non root user
-RUN chmod u+s $(which cron)
-
-# Add Tini (https://github.com/krallin/tini#using-tini)
-ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
-
-
-
 ######################################
 ## Stage 5: Setup FPROC core image  ##
 ######################################
 
 # Create image
-FROM fproc_mgmt AS fproc-core
+FROM fproc_builder AS fproc-core
 
 # Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
