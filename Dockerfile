@@ -207,11 +207,11 @@ ENV CRON_TIME_STR=${CRON_TIME_STR}
 RUN printf "\n\
 # Setup cron to run files processor \n\
 ${CRON_TIME_STR} /usr/local/bin/python ${FPROC_HOME}/main.py >> /proc/1/fd/1 2>> /proc/1/fd/1\n\
-\n" > ${FPROC_HOME}/crontab.txt
-RUN chmod a+rw ${FPROC_HOME}/crontab.txt
+\n" > ${FPROC_HOME}/crontab.conf
+RUN chmod a+rw ${FPROC_HOME}/crontab.conf
 
 # Setup CRON for root user
-RUN (cat ${FPROC_HOME}/crontab.txt) | crontab -
+RUN (cat ${FPROC_HOME}/crontab.conf) | crontab -
 
 # Crear script de inicio.
 RUN printf "#!/bin/bash \n\
@@ -421,7 +421,7 @@ RUN chown -R $USER_UID:$USER_GID $FPROC_HOME
 RUN chmod u+s $(which cron)
 
 # Setup cron
-RUN (cat $FPROC_HOME/crontab.txt) | crontab -u $USR_NAME -
+RUN (cat $FPROC_HOME/crontab.conf) | crontab -u $USR_NAME -
 
 # Add Tini (https://github.com/krallin/tini#using-tini)
 ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
