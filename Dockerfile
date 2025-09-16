@@ -14,17 +14,17 @@
 ## Set GLOBAL arguments ##
 ##########################
 
-# Set python version
+# Set Python version
 ARG PYTHON_VERSION="3.12"
+
+# Set Python image variant
+ARG IMG_VARIANT="-slim"
 
 # Set FPROC HOME
 ARG FPROC_HOME="/opt/files-processor"
 
 # Set global CRON args
 ARG CRON_TIME_STR="0 0 18 * *"
-
-# Set Pycharm version
-ARG PYCHARM_VERSION="2025.1"
 
 
 
@@ -33,7 +33,7 @@ ARG PYCHARM_VERSION="2025.1"
 ######################################
 
 # Create image
-FROM python:${PYTHON_VERSION}-slim AS py_builder
+FROM python:${PYTHON_VERSION}${IMG_VARIANT} AS py_builder
 
 # Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
@@ -43,9 +43,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install OS packages
-RUN apt-get -y -qq update && \
-    apt-get -y -qq upgrade && \
-    apt-get -y -qq --no-install-recommends install \
+RUN apt-get --quiet --assume-yes update && \
+    apt-get --quiet --assume-yes upgrade && \
+    apt-get --quiet --assume-yes --no-install-recommends install \
         build-essential && \
     rm -rf /var/lib/apt/lists/*
 
@@ -53,10 +53,12 @@ RUN apt-get -y -qq update && \
 WORKDIR /usr/src/app
 
 # Upgrade pip and install dependencies
-COPY requirements.txt /tmp/requirements.txt
-RUN python3 -m pip install --upgrade pip && \
-    python3 -m pip wheel --no-cache-dir --no-deps \
-    --wheel-dir /usr/src/app/wheels -r /tmp/requirements.txt
+RUN python3 -m pip install --upgrade pip
+# Copy dependencies from build context
+COPY requirements.txt requirements.txt
+# Install Python dependencies (ver: https://stackoverflow.com/a/17311033/5076110)
+RUN python3 -m pip wheel --no-cache-dir --no-deps \
+    --wheel-dir /usr/src/app/wheels -r requirements.txt
 
 
 
@@ -71,8 +73,8 @@ FROM python:${PYTHON_VERSION}-slim AS py_final
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install OS packages
-RUN apt-get -y -qq update && \
-    apt-get -y -qq upgrade && \
+RUN apt-get --quiet --assume-yes update && \
+    apt-get --quiet --assume-yes upgrade && \
     rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies from py_builder
@@ -83,9 +85,9 @@ RUN python3 -m pip install --upgrade pip && \
 
 
 
-###########################################
-## Stage 3: Install management packages  ##
-###########################################
+##########################################
+## Stage 3: Install management packages ##
+##########################################
 
 # Create image
 FROM py_final AS base_image
@@ -94,9 +96,8 @@ FROM py_final AS base_image
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install OS packages
-RUN apt-get -y -qq update && \
-    apt-get -y -qq upgrade && \
-    apt-get -y -qq --no-install-recommends install \
+RUN apt-get --quiet --assume-yes update && \
+    apt-get --quiet --assume-yes --no-install-recommends install \
         # install Tini (https://github.com/krallin/tini#using-tini)
         tini \
         # to see process with pid 1
@@ -107,7 +108,33 @@ RUN apt-get -y -qq update && \
         cron && \
     rm -rf /var/lib/apt/lists/*
 
-# Setup cron to allow it run as a non root user
+# Create utils directory
+RUN mkdir -p /opt/utils
+
+# Create script to load environment variables
+RUN printf "#!/bin/bash \n\
+export \$(cat /proc/1/environ | tr '\0' '\n' | xargs -0 -I {} echo \"{}\") \n\
+\n" > /opt/utils/load-envvars
+
+# Create startup/entrypoint script
+RUN printf "#!/bin/bash \n\
+set -e \n\
+\043 https://docs.docker.com/reference/dockerfile/#entrypoint \n\
+exec \"\$@\" \n\
+\n" > /opt/utils/entrypoint
+
+# Create script to check the container's health
+RUN printf "#!/bin/bash \n\
+exit 0 \n\
+\n" > /opt/utils/check-healthy
+
+# Set minimal permissions to the utils scripts
+RUN chmod --recursive u=rx,g=rx,o=rx /opt/utils
+
+# Allows utils scripts to run as a non-root user
+RUN chmod u+s /opt/utils/load-envvars
+
+# Setup cron to allow it to run as a non-root user
 RUN chmod u+s $(which cron)
 
 # Add Tini (https://github.com/krallin/tini#using-tini)
@@ -125,7 +152,15 @@ FROM base_image AS fproc_builder
 # Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Renew FPROC_HOME
+# Install OS packages
+RUN apt-get --quiet --assume-yes update && \
+    apt-get --quiet --assume-yes --no-install-recommends install \
+        # to save scripts PID
+        # to check container health
+        redis-tools && \
+    rm -rf /var/lib/apt/lists/*
+
+# Renew ARGs
 ARG FPROC_HOME
 
 # Create FPROC_HOME folder
@@ -149,33 +184,28 @@ RUN export head=$(cat /tmp/git/HEAD | cut -d' ' -f2) && \
     export hash=$(cat /tmp/git/${head}); else export hash=${head}; fi && \
     echo "${hash}" > ${FPROC_HOME}/repo_version && rm -rf /tmp/git
 
-# Set permissions of app files
-RUN chmod -R ug+rw,o+r ${FPROC_HOME}
+# Set minimum required file permissions
+RUN chmod -R u=rw,g=rw,o=r ${FPROC_HOME}
 
 
 
-######################################
-## Stage 5: Setup FPROC core image  ##
-######################################
+#####################################
+## Stage 5: Setup FPROC core image ##
+#####################################
 
 # Create image
-FROM fproc_builder AS fproc-core
+FROM fproc_builder AS fproc_core
 
 # Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Renew FPROC_HOME
+# Renew ARGs
 ARG FPROC_HOME
-
-# Renew CRON ARGs
 ARG CRON_TIME_STR
 
 # Install OS packages
-RUN apt-get -y -qq update && \
-    apt-get -y -qq upgrade && \
-    apt-get -y -qq --no-install-recommends install \
-        # to check container health
-        redis-tools \
+RUN apt-get --quiet --assume-yes update && \
+    apt-get --quiet --assume-yes --no-install-recommends install \
         # to configure locale
         locales && \
     rm -rf /var/lib/apt/lists/*
@@ -185,35 +215,30 @@ RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
     sed -i -e 's/# es_US.UTF-8 UTF-8/es_US.UTF-8 UTF-8/' /etc/locale.gen && \
     dpkg-reconfigure --frontend=noninteractive locales
 
-# Set read-only environment variables
-ENV FPROC_HOME=${FPROC_HOME}
+# Set locale
+ENV LC_ALL en_US.UTF-8
 
-# Set environment variables
-ENV CRON_TIME_STR=${CRON_TIME_STR}
-
-# Crear archivo de configuración de CRON
+# Create CRON configuration file
 RUN printf "\n\
-# Setup cron to run files processor \n\
+SHELL=/bin/bash \n\
+BASH_ENV=/opt/utils/load-envvars \n\
+\n\
+\043 Setup cron to run files processor \n\
 ${CRON_TIME_STR} /usr/local/bin/python ${FPROC_HOME}/main.py >> /proc/1/fd/1 2>> /proc/1/fd/1\n\
 \n" > ${FPROC_HOME}/crontab.conf
-RUN chmod a+rw ${FPROC_HOME}/crontab.conf
 
-# Setup CRON for root user
-RUN (cat ${FPROC_HOME}/crontab.conf) | crontab -
-
-# Crear script de inicio.
+# Create startup/entrypoint script
 RUN printf "#!/bin/bash \n\
 set -e \n\
 \n\
-# Reemplazar tiempo ejecución automática del procesador de archivos \n\
-crontab -l | sed \"/main.py/ s|^\S* \S* \S* \S* \S*|\$CRON_TIME_STR|g\" | crontab - \n\
+\043 Reemplazar tiempo ejecución automática del procesador de archivos \n\
+sed -i \"/main.py/ s|^\d\S+\s\S+\s\S+\s\S+\s\S+\s|\$CRON_TIME_STR|g\" /opt/utils/crontab.conf \n\
+crontab -l | sed \"/main.py/ s|^\d\S+\s\S+\s\S+\s\S+\s\S+\s|\$CRON_TIME_STR|g\" | crontab - \n\
 \n\
-# Ejecutar cron \n\
-cron -fL 15 \n\
-\n" > /startup.sh
-RUN chmod a+x /startup.sh
+exec \"\$@\" \n\
+\n" > /opt/utils/entrypoint
 
-# Crear script para verificar salud del contendor
+# Create script to check the container's health
 RUN printf "#!/bin/bash\n\
 if [ \$(find ${FPROC_HOME} -type f -name '*.pid' 2>/dev/null | wc -l) != 0 ] || \n\
    [ \$(echo 'KEYS *' | redis-cli -h \${REDIS_HOST} 2>/dev/null | grep -c files-processor) != 0 ] && \n\
@@ -223,15 +248,59 @@ then \n\
 else \n\
   exit 0 \n\
 fi \n\
-\n" > /check-healthy.sh
-RUN chmod a+x /check-healthy.sh
+\n" > /opt/utils/check-healthy
+
+# Set minimal permissions to the new scripts and files
+RUN chmod u=rw,g=r,o=r ${EREG_HOME}/crontab.conf
+
+# Set read-only environment variables
+ENV FPROC_HOME=${FPROC_HOME}
+
+# Set user-definable environment variables
+ENV CRON_TIME_STR=${CRON_TIME_STR}
+
+# Declare optional environment variables
+ENV REDIS_HOST=localhost
+
+
+
+######################################
+## Stage 6: Setup FPROC final image ##
+######################################
+
+# Create image
+FROM fproc_core AS fproc-root
+
+# Set environment variables
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Renew ARGs
+ARG FPROC_HOME
+
+# Setup CRON for root user
+RUN (cat ${FPROC_HOME}/crontab.conf) | crontab -
+
+# Create standard directories used for specific types of user-specific data, as defined 
+# by the XDG Base Directory Specification. For when "docker run --user uid:gid" is used.
+# OBS: don't forget to add --env HOME=/home when running the container.
+RUN mkdir -p /home/.local/share && \
+    mkdir -p /home/.cache && \
+    mkdir -p /home/.config
+# Set permissions, for when "docker run --user uid:gid" is used
+RUN chmod -R a+rwx /home/.local /home/.cache /home/.config
+
+# Add Tini (https://github.com/krallin/tini#using-tini)
+ENTRYPOINT [ "/usr/bin/tini", "-g", "--", "/opt/utils/entrypoint" ]
 
 # Run your program under Tini (https://github.com/krallin/tini#using-tini)
-CMD [ "bash", "-c", "/startup.sh" ]
+CMD [ "cron", "-fL", "15" ]
 # or docker run your-image /your/program ...
 
-# Verificar si hubo alguna falla en la ejecución del replicador
-HEALTHCHECK --interval=3s --timeout=3s --retries=3 CMD bash /check-healthy.sh
+# Configurar verificación de la salud del contenedor
+HEALTHCHECK --interval=3s --timeout=3s --retries=3 CMD bash /opt/utils/check-healthy
+
+# Set work directory
+WORKDIR ${FPROC_HOME}
 
 
 
@@ -242,7 +311,7 @@ HEALTHCHECK --interval=3s --timeout=3s --retries=3 CMD bash /check-healthy.sh
 
 # CONSTRUIR IMAGEN (CORE)
 # docker build --force-rm \
-#   --target fproc-core \
+#   --target fproc-root \
 #   --tag ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0 \
 #   --build-arg CRON_TIME_STR="0 0 18 * *" \
 #   --file Dockerfile .
