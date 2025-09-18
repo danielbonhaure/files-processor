@@ -184,8 +184,9 @@ RUN export head=$(cat /tmp/git/HEAD | cut -d' ' -f2) && \
     export hash=$(cat /tmp/git/${head}); else export hash=${head}; fi && \
     echo "${hash}" > ${FPROC_HOME}/repo_version && rm -rf /tmp/git
 
-# Set minimum required file permissions
-RUN chmod -R u=rw,g=rw,o=r ${FPROC_HOME}
+# Set minimum required permissions for files and folders
+RUN find ${FPROC_HOME} -type f -exec chmod -R u=rw,g=rw,o=r -- {} + && \
+    find ${FPROC_HOME} -type d -exec chmod -R u=rwx,g=rwx,o=rx -- {} +
 
 
 
