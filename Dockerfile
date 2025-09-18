@@ -67,7 +67,7 @@ RUN python3 -m pip wheel --no-cache-dir --no-deps \
 ###############################################
 
 # Create image
-FROM python:${PYTHON_VERSION}-slim AS py_final
+FROM python:${PYTHON_VERSION}${IMG_VARIANT} AS py_final
 
 # Set environment variables
 ARG DEBIAN_FRONTEND=noninteractive
