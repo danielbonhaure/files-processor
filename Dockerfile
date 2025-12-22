@@ -233,7 +233,7 @@ RUN printf "#!/bin/bash \n\
 set -e \n\
 \n\
 \043 Reemplazar tiempo ejecución automática del procesador de archivos \n\
-sed -i \"/main.py/ s|^\d\S+\s\S+\s\S+\s\S+\s\S+\s|\$CRON_TIME_STR|g\" /opt/utils/crontab.conf \n\
+sed -i \"/main.py/ s|^\d\S+\s\S+\s\S+\s\S+\s\S+\s|\$CRON_TIME_STR|g\" ${FPROC_HOME}/crontab.conf \n\
 crontab -l | sed \"/main.py/ s|^\d\S+\s\S+\s\S+\s\S+\s\S+\s|\$CRON_TIME_STR|g\" | crontab - \n\
 \n\
 exec \"\$@\" \n\
@@ -253,7 +253,7 @@ fi \n\
 \n" > /opt/utils/check-healthy
 
 # Set minimal permissions to the new scripts and files
-RUN chmod u=rw,g=r,o=r ${EREG_HOME}/crontab.conf
+RUN chmod u=rw,g=r,o=r ${FPROC_HOME}/crontab.conf
 
 # Set read-only environment variables
 ENV FPROC_HOME=${FPROC_HOME}
