@@ -241,8 +241,9 @@ exec \"\$@\" \n\
 
 # Create script to check the container's health
 RUN printf "#!/bin/bash\n\
+readonly TRGT='files-processor' \n\
 if [ \$(find ${FPROC_HOME} -type f -name '*.pid' 2>/dev/null | wc -l) != 0 ] || \n\
-   [ \$(echo 'KEYS *' | redis-cli -h \${REDIS_HOST} 2>/dev/null | grep -c files-processor) != 0 ] && \n\
+   [ \$(echo 'KEYS *' | redis-cli -h \${REDIS_HOST} 2>/dev/null | grep -c \${TRGT}) != 0 ] && \n\
    [ \$(ps -ef | grep -v 'grep' | grep -c 'python') == 0 ] \n\
 then \n\
   exit 1 \n\
