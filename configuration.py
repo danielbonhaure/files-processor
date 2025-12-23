@@ -71,6 +71,10 @@ class DescFilesSelector(object):
         # Definir año y mes objetivos
         self.target_year: int = target_year
         self.target_month: int = target_month
+        
+        # Verificar argumentos
+        if target_month < 1 or target_month > 12:
+            raise ValueError('Wrong arguments (target_month must be between 1 and 12)')
 
         # Obtener abreviatura para el mes objetivo (target_month)
         self.target_month_abbr: str = Mpro.month_int_to_abbr(target_month)
@@ -99,8 +103,12 @@ class DescFilesSelector(object):
         # Crear lista para almacenar descriptores a procesar
         desc_files: list[Path] = []
 
+        # Definir meses objetivo
+        start = 1 if self.target_month == 12 else self.target_month + 1
+        fcst_months = [month for month in nrange(start, 6, 12)]
+
         # Buscar descriptores para los distintos leadtimes (pronos mensuales)
-        for fcst_month in nrange(self.target_month+1, 5, 12):
+        for fcst_month in fcst_months:
 
             # Definir el patrón de búsqueda (predictands)
             rglob_pattern = f'*_{fcst_month}.yaml'
@@ -134,8 +142,12 @@ class DescFilesSelector(object):
         # Crear lista para almacenar descriptores a procesar
         desc_files: list[Path] = []
 
+        # Definir meses de inicio de los trimestres objetivo
+        start = 1 if self.target_month == 12 else self.target_month + 1
+        first_fcst_months = [month for month in nrange(start, 6, 12)]
+
         # Buscar descriptores para los distintos leadtimes (pronos trimestrales)
-        for first_fcst_month in nrange(self.target_month+1, 5, 12):
+        for first_fcst_month in first_fcst_months:
 
             last_fcst_month = Mpro.add_months(first_fcst_month, 2)
 

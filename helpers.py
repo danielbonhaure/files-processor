@@ -40,7 +40,7 @@ def nrange(start, n_steps, modulo):
         raise ValueError('Wrong arguments (start cannot be greater than modulo)')
     # Ejecutar función
     values, last_value = [start], start
-    for _ in repeat(None, n_steps): # Cycles n_steps times
+    for _ in repeat(None, n_steps-1):
         last_value = last_value + 1
         if last_value > 12:
             last_value = last_value - 12
