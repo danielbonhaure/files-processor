@@ -8,6 +8,7 @@ from pathlib import Path
 import os
 import yaml
 import logging
+import re
 
 
 @Singleton
@@ -103,6 +104,9 @@ class DescFilesSelector(object):
         # Crear lista para almacenar descriptores a procesar
         desc_files: list[Path] = []
 
+        # Obtener todos los archivos .yaml existentes
+        yaml_files = sorted(self.target_folder.rglob(f'*.yaml'))
+
         # Definir meses objetivo
         start = 1 if self.target_month == 12 else self.target_month + 1
         fcst_months = [month for month in nrange(start, 6, 12)]
@@ -110,12 +114,10 @@ class DescFilesSelector(object):
         # Buscar descriptores para los distintos leadtimes (pronos mensuales)
         for fcst_month in fcst_months:
 
-            # Definir el patrón de búsqueda (predictands)
-            rglob_pattern = f'*_{fcst_month}.yaml'
-            logging.debug(f'rglob_pattern = {rglob_pattern}')
-            # Obtener listado de archivos de configuración y/o descriptores
-            c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
-            # Agregar descriptores al listado final
+            # Definir el patrón de búsqueda (obs_data/predictands)
+            regex = rf'(?:prcp|t2m)_(?:chirps|era5-land)_{fcst_month}.yaml'
+            pattern = re.compile(regex)  # compilar el patrón de búsqueda
+            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
             desc_files.extend(c_desc_files)
 
             # Definir año correspondiente a fcst_month
@@ -124,11 +126,9 @@ class DescFilesSelector(object):
                 fcst_year = self.target_year + 1
 
             # Definir el patrón de búsqueda (predictors and outputs)
-            rglob_pattern = f'*_{self.target_month_abbr}ic_{fcst_month}_*_{fcst_year}_1.yaml'
-            logging.debug(f'rglob_pattern = {rglob_pattern}')
-            # Obtener listado de archivos de configuración y/o descriptores
-            c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
-            # Agregar descriptores al listado final
+            regex = rf'.*_{self.target_month_abbr}ic_{fcst_month}_.*_{fcst_year}_1.yaml'
+            pattern = re.compile(regex)  # compilar el patrón de búsqueda
+            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
             desc_files.extend(c_desc_files)
 
         # Para garantizar que no se procese el archivo template.yaml
@@ -142,6 +142,9 @@ class DescFilesSelector(object):
         # Crear lista para almacenar descriptores a procesar
         desc_files: list[Path] = []
 
+        # Obtener todos los archivos .yaml existentes
+        yaml_files = sorted(self.target_folder.rglob(f'*.yaml'))
+
         # Definir meses de inicio de los trimestres objetivo
         start = 1 if self.target_month == 12 else self.target_month + 1
         first_fcst_months = [month for month in nrange(start, 6, 12)]
@@ -151,12 +154,11 @@ class DescFilesSelector(object):
 
             last_fcst_month = Mpro.add_months(first_fcst_month, 2)
 
-            # Definir el patrón de búsqueda (predictands)
-            rglob_pattern = f'*_{first_fcst_month}-{last_fcst_month}.yaml'
-            logging.debug(f'rglob_pattern = {rglob_pattern}')
-            # Obtener listado de archivos de configuración y/o descriptores
-            c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
-            # Agregar descriptores al listado final
+            # Definir el patrón de búsqueda (obs_data/predictands)
+            regex = rf'(?:prcp|t2m)_(?:chirps|era5-land)_'\
+                    rf'{first_fcst_month}-{last_fcst_month}.yaml'
+            pattern = re.compile(regex)  # compilar el patrón de búsqueda
+            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
             desc_files.extend(c_desc_files)
 
             # Definir año correspondiente a first_fcst_year
@@ -170,13 +172,11 @@ class DescFilesSelector(object):
                 last_fcst_year = self.target_year + 1
 
             # Definir el patrón de búsqueda (predictors and outputs)
-            rglob_pattern = f'*_{self.target_month_abbr}ic_' \
-                            f'{first_fcst_month}-{last_fcst_month}_*_' \
-                            f'{first_fcst_year}-{last_fcst_year}_1.yaml'
-            logging.debug(f'rglob_pattern = {rglob_pattern}')
-            # Obtener listado de archivos de configuración y/o descriptores
-            c_desc_files = sorted(self.target_folder.rglob(rglob_pattern))
-            # Agregar descriptores al listado final
+            regex = rf'.*_{self.target_month_abbr}ic_' \
+                    rf'{first_fcst_month}-{last_fcst_month}_.*_' \
+                    rf'{first_fcst_year}-{last_fcst_year}_1.yaml'
+            pattern = re.compile(regex)  # compilar el patrón de búsqueda
+            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
             desc_files.extend(c_desc_files)
 
         # Para garantizar que no se procese el archivo template.yaml
