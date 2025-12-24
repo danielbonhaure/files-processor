@@ -134,6 +134,7 @@ CMD ["pycharm", "--version"]
 #   --privileged \
 #   --mount type=bind,src=$(pwd),dst=/opt/files-processor \
 #   --workdir /opt/files-processor \
+#   --entrypoint "" \
 #   --tty --interactive pycharm-fproc:latest  \
 # pycharm -Dide.browser.jcef.enabled=true -Dawt.toolkit.name=XToolkit -Dide.browser.jcef.log.level=verbose
 
@@ -150,5 +151,6 @@ CMD ["pycharm", "--version"]
 #   --privileged \
 #   --mount type=bind,src=$(pwd),dst=/opt/files-processor \
 #   --workdir /opt/files-processor \
+#   --entrypoint "" \
 #   --tty --interactive pycharm-fproc:latest \
 # pycharm -Dide.browser.jcef.enabled=false -Dawt.toolkit.name=WLToolkit -Dide.browser.jcef.log.level=verbose
