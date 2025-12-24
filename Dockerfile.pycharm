@@ -132,10 +132,8 @@ CMD ["pycharm", "--version"]
 #   --mount type=bind,src=/tmp/.X11-unix,dst=/tmp/.X11-unix,readonly \
 #   --mount type=bind,src=$XDG_RUNTIME_DIR/at-spi/bus,dst=$XDG_RUNTIME_DIR/at-spi/bus,readonly \
 #   --privileged \
-#   --mount type=bind,src=$(pwd)/input,dst=/opt/pyCPT/input \
-#   --mount type=bind,src=$(pwd)/output,dst=/opt/pyCPT/output \
-#   --env-file .env \
-#   --workdir /opt/pyCPT \
+#   --mount type=bind,src=$(pwd),dst=/opt/files-processor \
+#   --workdir /opt/files-processor \
 #   --tty --interactive pycharm-fproc:latest  \
 # pycharm -Dide.browser.jcef.enabled=true -Dawt.toolkit.name=XToolkit -Dide.browser.jcef.log.level=verbose
 
@@ -150,9 +148,7 @@ CMD ["pycharm", "--version"]
 #   --env DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
 #   --mount type=bind,source=$XDG_RUNTIME_DIR/bus,dst=$XDG_RUNTIME_DIR/bus,readonly \
 #   --privileged \
-#   --mount type=bind,src=$(pwd)/input,dst=/opt/pyCPT/input \
-#   --mount type=bind,src=$(pwd)/output,dst=/opt/pyCPT/output \
-#   --env-file .env \
-#   --workdir /opt/pyCPT \
+#   --mount type=bind,src=$(pwd),dst=/opt/files-processor \
+#   --workdir /opt/files-processor \
 #   --tty --interactive pycharm-fproc:latest \
 # pycharm -Dide.browser.jcef.enabled=false -Dawt.toolkit.name=WLToolkit -Dide.browser.jcef.log.level=verbose
