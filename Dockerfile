@@ -234,7 +234,7 @@ set -e \n\
 \n\
 \043 Reemplazar tiempo ejecución automática del procesador de archivos \n\
 declare CRON_REGEX=\"^([[:graph:]]+[[:space:]]+){4}[[:graph:]]+\" \n\
-sed -iE \"/JOB_ID_1/ s|\${CRON_REGEX}|\${CRON_TIME_STR}|g\" ${FPROC_HOME}/crontab.conf \n\
+sed -i -E \"/JOB_ID_1/ s|\${CRON_REGEX}|\${CRON_TIME_STR}|g\" ${FPROC_HOME}/crontab.conf \n\
 crontab -l | sed -E \"/JOB_ID_1/ s|\${CRON_REGEX}|\${CRON_TIME_STR}|g\" | crontab - \n\
 \n\
 exec \"\$@\" \n\
