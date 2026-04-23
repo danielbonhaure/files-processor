@@ -151,14 +151,15 @@ class ReadCPToutputDET(ReadStrategy):
                               na_values=[info.na_values, int(info.na_values), float(info.na_values)])
 
         # Crear df con índice igual a longitude, latitude, year
-        final_df = pd.DataFrame()
+        year_dataframes = list()  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
         for year in data_df.index.to_list():
             year_data_df = pd.DataFrame({file_variable: data_df.loc[year]})
             year_data_df = coord_data_df.join(year_data_df)
             # OBS: init_time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
             init_year = year - 1 if forecast_month > first_target_month else year
             year_data_df.insert(2, 'init_time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
-            final_df = pd.concat([final_df, year_data_df])
+            year_dataframes.append(year_data_df)  # to avoid fragmentation (https://stackoverflow.com/q/68292862))
+        final_df = pd.concat(year_dataframes)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
 
         # Modificar años, en caso de que sea necesario
         if desc_file is not None and desc_file.get('swap_years') is not None:
@@ -183,8 +184,10 @@ class ReadCPToutputDET(ReadStrategy):
                 # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
                 years_to_swap = set([y for y in final_df['init_time'].dt.year if y > last_hindcast_year])
 
-                # Se crea un dataframe con los años renombrados
-                anhos_renombrados = pd.DataFrame()
+                # Se crea una lista que contiene los dataframes con años renombrados.
+                # Esta lista se concatena una sola vez al final de la operación, lo que
+                # permite evitar fragmentación (https://stackoverflow.com/q/68292862)
+                anhos_dataframes = list()
 
                 # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
                 # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
@@ -193,10 +196,13 @@ class ReadCPToutputDET(ReadStrategy):
                     aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
                     # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
                     aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
-                    # Se agrega el dataframe aux al df con los años renombrados
-                    anhos_renombrados = pd.concat([anhos_renombrados, aux])
-                    # Se asgina NA al año que ya fue renombrado
+                    # Se agrega el dataframe aux a la lista con los años renombrados
+                    anhos_dataframes.append(aux)
+                    # Se asigna NA al año que ya fue renombrado
                     final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
+                
+                # Se concatenan todos los dataframes de una sola vez para evitar fragmentación
+                anhos_renombrados = pd.concat(anhos_dataframes)
 
                 # Se reemplaza los valores con NA en final_df con los valores corregidos
                 final_df = final_df.merge(anhos_renombrados, how='outer')
@@ -290,6 +296,7 @@ class ReadCPToutputPROB(ReadStrategy):
                 year_data_df.insert(3, 'category', category)
                 category_df = pd.concat([category_df, year_data_df])
             final_df = pd.concat([final_df, category_df])
+        final_df = final_df.copy()  # clean up fragmentation
 
         # Modificar años, en caso de que sea necesario
         if desc_file is not None and desc_file.get('swap_years') is not None:
@@ -314,8 +321,10 @@ class ReadCPToutputPROB(ReadStrategy):
                 # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
                 years_to_swap = set([y for y in final_df['init_time'].dt.year if y > last_hindcast_year])
 
-                # Se crea un dataframe con los años renombrados
-                anhos_renombrados = pd.DataFrame()
+                # Se crea una lista que contiene los dataframes con años renombrados.
+                # Esta lista se concatena una sola vez al final de la operación, lo que
+                # permite evitar fragmentación (https://stackoverflow.com/q/68292862)
+                anhos_dataframes = list()
 
                 # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
                 # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
@@ -324,10 +333,13 @@ class ReadCPToutputPROB(ReadStrategy):
                     aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
                     # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
                     aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
-                    # Se agrega el dataframe aux al df con los años renombrados
-                    anhos_renombrados = pd.concat([anhos_renombrados, aux])
-                    # Se asgina NA al año que ya fue renombrado
+                    # Se agrega el dataframe aux a la lista con los años renombrados
+                    anhos_dataframes.append(aux)
+                    # Se asigna NA al año que ya fue renombrado
                     final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
+                
+                # Se concatenan todos los dataframes de una sola vez para evitar fragmentación
+                anhos_renombrados = pd.concat(anhos_dataframes)
 
                 # Se reemplaza los valores con NA en final_df con los valores corregidos
                 final_df = final_df.merge(anhos_renombrados, how='outer')
@@ -411,12 +423,13 @@ class ReadCPTpredictand(ReadStrategy):
                               na_values=['-999', -999, -999.0])
 
         # Crear df con índice igual a longitude, latitude, year
-        final_df = pd.DataFrame()
+        year_dataframes = list()  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
         for year in data_df.index.to_list():
             year_data_df = pd.DataFrame({file_variable: data_df.loc[year]})
             year_data_df = coord_data_df.join(year_data_df)
             year_data_df.insert(2, 'init_time', pd.to_datetime(f'{year}-{first_month}-01'))
-            final_df = pd.concat([final_df, year_data_df])
+            year_dataframes.append(year_data_df)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
+        final_df = pd.concat(year_dataframes)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
 
         # Reindexar el dataframe
         final_df = final_df.set_index(['init_time', 'latitude', 'longitude']).sort_index()
@@ -458,7 +471,7 @@ class ReadCPTpredictor(ReadStrategy):
         file_variable = 'prcp' if file_variable == 'precip' else 't2m' if file_variable == 'tmp2m' else None
 
         # Gen dataframe for current file accessing only rows with data
-        final_df = pd.DataFrame()
+        info_dataframes = list()  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
         for info in df_info:
             df = pd.read_csv(file_name, sep='\t', index_col=0, skiprows=info.field_line, nrows=info.n_rows,
                              na_values=[info.na_values, int(info.na_values), float(info.na_values)])
@@ -466,7 +479,8 @@ class ReadCPTpredictor(ReadStrategy):
             df = df.melt(id_vars=['latitude'], var_name='longitude', value_name=file_variable)
             df['longitude'] = df['longitude'].astype(float)
             df.insert(0, 'init_time', info.start_date)
-            final_df = pd.concat([final_df, df])
+            info_dataframes.append(df)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
+        final_df = pd.concat(info_dataframes)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
 
         # Modificar años, en caso de que sea necesario
         if desc_file is not None and desc_file.get('swap_years') is not None:
@@ -491,8 +505,10 @@ class ReadCPTpredictor(ReadStrategy):
                 # Identificar los años posteriores al último año de hindcast, todos estos años deben ser renombrados
                 years_to_swap = set([y for y in final_df['init_time'].dt.year if y > last_hindcast_year])
 
-                # Se crea un dataframe con los años renombrados
-                anhos_renombrados = pd.DataFrame()
+                # Se crea una lista que contiene los dataframes con años renombrados.
+                # Esta lista se concatena una sola vez al final de la operación, lo que
+                # permite evitar fragmentación (https://stackoverflow.com/q/68292862)
+                anhos_dataframes = list()
 
                 # Recorrer los años que deben ser renombrados, "y" es el año a ser modificado y "n" es la
                 # cantidad que debe sumarse al primer año pronosticado para obtener el año final.
@@ -501,10 +517,13 @@ class ReadCPTpredictor(ReadStrategy):
                     aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
                     # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
                     aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
-                    # Se agrega el dataframe aux al df con los años renombrados
-                    anhos_renombrados = pd.concat([anhos_renombrados, aux])
-                    # Se asgina NA al año que ya fue renombrado
+                    # Se agrega el dataframe aux a la lista con los años renombrados
+                    anhos_dataframes.append(aux)
+                    # Se asigna NA al año que ya fue renombrado
                     final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
+                
+                # Se concatenan todos los dataframes de una sola vez para evitar fragmentación
+                anhos_renombrados = pd.concat(anhos_dataframes)
 
                 # Se reemplaza los valores con NA en final_df con los valores corregidos
                 final_df = final_df.merge(anhos_renombrados, how='outer')
