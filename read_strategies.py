@@ -100,6 +100,10 @@ class FileReader(object):
         if self.output_file_must_be_created(desc_file):
             # Leer el archivo en un Dataset
             with self.read_file(desc_file) as ds:
+                # Convert categories to strings (categories can't be saved to NetCDF files!)
+                for var in ds.variables:
+                    if ds[var].dtype == 'category':
+                        ds[var] = ds[var].astype(str)
                 # Guardar el dataset en un NetCDF
                 ds.to_netcdf(self.define_output_filename(desc_file))
 
