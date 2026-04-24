@@ -158,7 +158,9 @@ class ReadCPToutputDET(ReadStrategy):
             # OBS: init_time indica el año y mes del mes inicial (start_month, init_month, el mes con leadtime 0)
             init_year = year - 1 if forecast_month > first_target_month else year
             year_data_df.insert(2, 'init_time', pd.to_datetime(f'{init_year}-{forecast_month}-01'))
+            year_data_df = year_data_df.copy() # clean up fragmentation
             year_dataframes.append(year_data_df)  # to avoid fragmentation (https://stackoverflow.com/q/68292862))
+            del year_data_df  # se remueve el objeto para liberar memoria
         final_df = pd.concat(year_dataframes)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
 
         # Modificar años, en caso de que sea necesario
@@ -196,8 +198,12 @@ class ReadCPToutputDET(ReadStrategy):
                     aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
                     # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
                     aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
+                    # Se copia el dataframe para evitar framentación
+                    aux = aux.copy() # clean up fragmentation
                     # Se agrega el dataframe aux a la lista con los años renombrados
                     anhos_dataframes.append(aux)
+                    # Se remueve el objeto para liberar memoria
+                    del aux  
                     # Se asigna NA al año que ya fue renombrado
                     final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
                 
@@ -333,8 +339,12 @@ class ReadCPToutputPROB(ReadStrategy):
                     aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
                     # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
                     aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
+                    # Se copia el dataframe para evitar framentación
+                    aux = aux.copy() # clean up fragmentation
                     # Se agrega el dataframe aux a la lista con los años renombrados
                     anhos_dataframes.append(aux)
+                    # Se remueve el objeto para liberar memoria
+                    del aux  
                     # Se asigna NA al año que ya fue renombrado
                     final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
                 
@@ -428,7 +438,9 @@ class ReadCPTpredictand(ReadStrategy):
             year_data_df = pd.DataFrame({file_variable: data_df.loc[year]})
             year_data_df = coord_data_df.join(year_data_df)
             year_data_df.insert(2, 'init_time', pd.to_datetime(f'{year}-{first_month}-01'))
+            year_data_df = year_data_df.copy() # clean up fragmentation
             year_dataframes.append(year_data_df)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
+            del year_data_df  # se remueve el objeto para liberar memoria
         final_df = pd.concat(year_dataframes)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
 
         # Reindexar el dataframe
@@ -475,11 +487,13 @@ class ReadCPTpredictor(ReadStrategy):
         for info in df_info:
             df = pd.read_csv(file_name, sep='\t', index_col=0, skiprows=info.field_line, nrows=info.n_rows,
                              na_values=[info.na_values, int(info.na_values), float(info.na_values)])
+            df = df.copy() # clean up fragmentation
             df['latitude'] = df.index
             df = df.melt(id_vars=['latitude'], var_name='longitude', value_name=file_variable)
             df['longitude'] = df['longitude'].astype(float)
             df.insert(0, 'init_time', info.start_date)
             info_dataframes.append(df)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
+            del df  # se remueve el objeto para liberar memoria
         final_df = pd.concat(info_dataframes)  # to avoid fragmentation (https://stackoverflow.com/q/68292862)
 
         # Modificar años, en caso de que sea necesario
@@ -517,8 +531,12 @@ class ReadCPTpredictor(ReadStrategy):
                     aux = final_df.loc[final_df['init_time'].dt.year == y].copy(deep=True)
                     # Se actualiza el año en el dataframe auxiliar (que contiene un solo año)
                     aux['init_time'] = aux['init_time'].apply(lambda x: x.replace(year=first_forecast_year+n))
+                    # Se copia el dataframe para evitar framentación
+                    aux = aux.copy() # clean up fragmentation
                     # Se agrega el dataframe aux a la lista con los años renombrados
                     anhos_dataframes.append(aux)
+                    # Se remueve el objeto para liberar memoria
+                    del aux  
                     # Se asigna NA al año que ya fue renombrado
                     final_df.loc[final_df['init_time'].dt.year == y, file_variable] = np.nan
                 
