@@ -28,16 +28,28 @@ def parse_args() -> argparse.Namespace:
         help='Indicates the YEAR that should be considered by the files processor.')
     parser.add_argument('--month', type=int, default=now.month, dest='month',
         help='Indicates the MONTH that should be considered by the files processor.')
+    parser.add_argument('--all', action='store_true', dest='process_all_desc_files',
+        help='Indicates that all existing descriptor files must be processed.')
+    parser.add_argument('--skip-ereg', action='store_true', dest='skip_ereg',
+        help='Indicates whether only PyCPT descriptors must be considered.')
+    parser.add_argument('--skip-pycpt', action='store_true', dest='skip_pycpt',
+        help='Indicates whether only EREG descriptors must be considered.')
     parser.add_argument('--overwrite', action='store_true', dest='overwrite_output',
         help='Indicates if previously generated files should be overwritten or not.')
 
     args = parser.parse_args()
 
+    if args.process_all_desc_files:
+        args.year, args.month = None, None  # When there's no year and month, all desc files are processed!
+
+    if args.year and args.month and args.process_all_desc_files:
+        parser.error('Arguments --year and --month are mutually exclusive with argument --all!')
+
     if args.year and not args.month or not args.year and args.month:
         parser.error('Arguments --year and --month are mutually inclusive!')
 
-    if args.overwrite_output and not args.year and not args.month:
-        parser.error('You cannot overwrite outputs without specifying a year and month!')
+    if args.skip_ereg and args.skip_pycpt:
+        parser.error('Arguments --skip-ereg and --skip-pycpt are mutually exclusive!')
 
     return args
 
@@ -84,7 +96,9 @@ if __name__ == '__main__':
     config.set('overwrite_output', parsed_args.overwrite_output)
 
     # Crear objeto para seleccionar descriptores a procesar
-    selector = DescFilesSelector(parsed_args.year, parsed_args.month)
+    selector = DescFilesSelector(
+        target_year=parsed_args.year, target_month=parsed_args.month,
+        skip_ereg=parsed_args.skip_ereg, skip_pycpt=parsed_args.skip_pycpt)
     # Obtener listado de archivos de configuración (descriptores)
     desc_files = selector.target_descriptors
 

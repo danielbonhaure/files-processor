@@ -1,5 +1,6 @@
 from errors import ConfigError, DescriptorError
-from helpers import MonthsProcessor as Mpro, nrange
+from helpers import MonthsProcessor as Mpro
+from helpers import nrange, FilesSearcher
 from singleton import Singleton
 
 from typing import Any
@@ -8,7 +9,6 @@ from pathlib import Path
 import os
 import yaml
 import logging
-import re
 
 
 @Singleton
@@ -67,18 +67,25 @@ class DescriptorFile:
 
 class DescFilesSelector(object):
 
-    def __init__(self, target_year: int, target_month: int):
+    def __init__(self, target_year: int | None, target_month: int | None,
+                 skip_ereg: bool = False, skip_pycpt: bool = False):
 
         # Definir año y mes objetivos
-        self.target_year: int = target_year
-        self.target_month: int = target_month
-        
-        # Verificar argumentos
-        if target_month < 1 or target_month > 12:
-            raise ValueError('Wrong arguments (target_month must be between 1 and 12)')
+        self.target_year: int | None = target_year
+        self.target_month: int | None = target_month
+        self.target_month_abbr: str | None = None
 
-        # Obtener abreviatura para el mes objetivo (target_month)
-        self.target_month_abbr: str = Mpro.month_int_to_abbr(target_month)
+        # Se validan target_year y target_month (en caso de ser necesario)
+        if target_year is not None and target_month is not None:
+            # Verificar argumentos
+            if target_month < 1 or target_month > 12:
+                raise ValueError('Wrong arguments (target_month must be between 1 and 12)')
+            # Obtener abreviatura para el mes objetivo (target_month)
+            self.target_month_abbr = Mpro.month_int_to_abbr(target_month)
+
+        # Definir descriptores a ser considerados
+        self.skip_ereg: bool = skip_ereg
+        self.skip_pycpt: bool = skip_pycpt
 
         # Obtener la carpeta en la cual se van a buscar los descriptores
         self.target_folder: Path = Path(
@@ -88,8 +95,9 @@ class DescFilesSelector(object):
     def ereg_output_descriptor_files(self) -> list[Path]:
 
         # Definir el patrón de búsqueda
-        target_month_abbr = Mpro.month_int_to_abbr(self.target_month)
-        rglob_pattern = f'*_{target_month_abbr}{self.target_year}.yaml'
+        rglob_pattern = '*_descriptors*.yaml'
+        if self.target_year is not None and self.target_month_abbr is not None:
+            rglob_pattern = f'*_{self.target_month_abbr}{self.target_year}.yaml'
         logging.debug(f'rglob_pattern = {rglob_pattern}')
 
         # Obtener listado de archivos de configuración y/o descriptores
@@ -104,32 +112,38 @@ class DescFilesSelector(object):
         # Crear lista para almacenar descriptores a procesar
         desc_files: list[Path] = []
 
-        # Obtener todos los archivos .yaml existentes
+        # Crear objeto para filtrar archivos
         yaml_files = sorted(self.target_folder.rglob(f'*.yaml'))
+        searcher = FilesSearcher(target_files=yaml_files)
 
-        # Definir meses objetivo
-        start = 1 if self.target_month == 12 else self.target_month + 1
-        fcst_months = [month for month in nrange(start, 6, 12)]
-
-        # Buscar descriptores para los distintos leadtimes (pronos mensuales)
-        for fcst_month in fcst_months:
+        # 1er caso: cuando no se requiere filtrar por año y mes
+        if self.target_year is None and self.target_month is None:
 
             # Definir el patrón de búsqueda (obs_data/predictands)
-            regex = rf'(?:prcp|t2m)_(?:chirps|era5-land)_{fcst_month}.yaml'
-            pattern = re.compile(regex)  # compilar el patrón de búsqueda
-            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
-            desc_files.extend(c_desc_files)
-
-            # Definir año correspondiente a fcst_month
-            fcst_year = self.target_year
-            if self.target_month > fcst_month:
-                fcst_year = self.target_year + 1
-
+            regex_1 = rf'(?:prcp|t2m)_(?:chirps|era5-land)_[1-12].yaml'
             # Definir el patrón de búsqueda (predictors and outputs)
-            regex = rf'.*_{self.target_month_abbr}ic_{fcst_month}_.*_{fcst_year}_1.yaml'
-            pattern = re.compile(regex)  # compilar el patrón de búsqueda
-            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
-            desc_files.extend(c_desc_files)
+            regex_2 = rf'.*_(?:{"|".join(Mpro.trimesters[1:])})ic_[1-12]_.*_\d{4}_1.yaml'
+            # Seleccionar archivos
+            desc_files.extend(searcher.filter_files([regex_1, regex_2]))
+
+        # 2do caso: cuando sí se requiere filtrar por año y mes
+        if self.target_year is not None and self.target_month is not None:
+
+            # Definir meses objetivo
+            start = 1 if self.target_month == 12 else self.target_month + 1
+            fcst_months = [month for month in nrange(start, 6, 12)]
+            # Buscar descriptores para los distintos leadtimes (pronos mensuales)
+            for fcst_month in fcst_months:
+                # Definir el patrón de búsqueda (obs_data/predictands)
+                regex_1 = rf'(?:prcp|t2m)_(?:chirps|era5-land)_{fcst_month}.yaml'
+                # Definir año correspondiente a fcst_month
+                fcst_year = self.target_year
+                if self.target_month > fcst_month:
+                    fcst_year = self.target_year + 1
+                # Definir el patrón de búsqueda (predictors and outputs)
+                regex_2 = rf'.*_{self.target_month_abbr}ic_{fcst_month}_.*_{fcst_year}_1.yaml'
+                # Seleccionar archivos
+                desc_files.extend(searcher.filter_files([regex_1, regex_2]))
 
         # Para garantizar que no se procese el archivo template.yaml
         desc_files = [f for f in desc_files if f.name != 'template.yaml']
@@ -142,42 +156,41 @@ class DescFilesSelector(object):
         # Crear lista para almacenar descriptores a procesar
         desc_files: list[Path] = []
 
-        # Obtener todos los archivos .yaml existentes
+        # Crear objeto para filtrar archivos
         yaml_files = sorted(self.target_folder.rglob(f'*.yaml'))
+        searcher = FilesSearcher(target_files=yaml_files)
 
-        # Definir meses de inicio de los trimestres objetivo
-        start = 1 if self.target_month == 12 else self.target_month + 1
-        first_fcst_months = [month for month in nrange(start, 6, 12)]
-
-        # Buscar descriptores para los distintos leadtimes (pronos trimestrales)
-        for first_fcst_month in first_fcst_months:
-
-            last_fcst_month = Mpro.add_months(first_fcst_month, 2)
+        # 1er caso: cuando no se requiere filtrar por año y mes
+        if self.target_year is None and self.target_month is None:
 
             # Definir el patrón de búsqueda (obs_data/predictands)
-            regex = rf'(?:prcp|t2m)_(?:chirps|era5-land)_'\
-                    rf'{first_fcst_month}-{last_fcst_month}.yaml'
-            pattern = re.compile(regex)  # compilar el patrón de búsqueda
-            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
-            desc_files.extend(c_desc_files)
-
-            # Definir año correspondiente a first_fcst_year
-            first_fcst_year = self.target_year
-            if self.target_month > first_fcst_month:
-                first_fcst_year = self.target_year + 1
-
-            # Definir año correspondiente a last_fcst_year
-            last_fcst_year = self.target_year
-            if self.target_month > last_fcst_month:
-                last_fcst_year = self.target_year + 1
-
+            regex_1 = rf'(?:prcp|t2m)_(?:chirps|era5-land)_[1-12]-[1-12].yaml'
             # Definir el patrón de búsqueda (predictors and outputs)
-            regex = rf'.*_{self.target_month_abbr}ic_' \
-                    rf'{first_fcst_month}-{last_fcst_month}_.*_' \
-                    rf'{first_fcst_year}-{last_fcst_year}_1.yaml'
-            pattern = re.compile(regex)  # compilar el patrón de búsqueda
-            c_desc_files = [p for p in yaml_files if p.is_file() and pattern.search(p.name)]
-            desc_files.extend(c_desc_files)
+            regex_2 = rf'.*_(?:{"|".join(Mpro.trimesters[1:])})ic_[1-12]-[1-12]_.*_\d{4}-\d{4}_1.yaml'
+            # Seleccionar archivos
+            desc_files.extend(searcher.filter_files([regex_1, regex_2]))
+
+        # 2do caso: cuando sí se requiere filtrar por año y mes
+        if self.target_year is not None and self.target_month is not None:
+
+            # Definir meses de inicio de los trimestres objetivo
+            start = 1 if self.target_month == 12 else self.target_month + 1
+            first_fcst_months = [month for month in nrange(start, 6, 12)]
+
+            # Buscar descriptores para los distintos leadtimes (pronos trimestrales)
+            for first_fcst_month in first_fcst_months:
+                last_fcst_month = Mpro.add_months(first_fcst_month, 2)
+                # Definir el patrón de búsqueda (obs_data/predictands)
+                regex_1 = rf'(?:prcp|t2m)_(?:chirps|era5-land)_{first_fcst_month}-{last_fcst_month}.yaml'
+                # Definir año correspondiente a first_fcst_year
+                first_fcst_year = self.target_year + 1 if self.target_month > first_fcst_month else self.target_year
+                # Definir año correspondiente a last_fcst_year
+                last_fcst_year = self.target_year + 1 if self.target_month > last_fcst_month else self.target_year
+                # Definir el patrón de búsqueda (predictors and outputs)
+                regex_2 = rf'.*_{self.target_month_abbr}ic_{first_fcst_month}-{last_fcst_month}_'\
+                          rf'.*_{first_fcst_year}-{last_fcst_year}_1.yaml'
+                # Seleccionar archivos
+                desc_files.extend(searcher.filter_files([regex_1, regex_2]))
 
         # Para garantizar que no se procese el archivo template.yaml
         desc_files = [f for f in desc_files if f.name != 'template.yaml']
@@ -189,9 +202,9 @@ class DescFilesSelector(object):
     def target_descriptors(self) -> list[Path]:
 
         # Obtener descriptores
-        ereg_desc = self.ereg_output_descriptor_files()
-        pycpt_desc_1 = self.pycpt_descriptor_files_months()
-        pycpt_desc_2 = self.pycpt_descriptor_files_trimesters()
+        ereg_desc = [] if self.skip_ereg else self.ereg_output_descriptor_files()
+        pycpt_desc_1 = [] if self.skip_pycpt else self.pycpt_descriptor_files_months()
+        pycpt_desc_2 = [] if self.skip_pycpt else self.pycpt_descriptor_files_trimesters()
 
         # Retornar descriptores
         return ereg_desc + pycpt_desc_1 + pycpt_desc_2

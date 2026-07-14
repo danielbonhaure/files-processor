@@ -2,17 +2,20 @@
 from contextlib import contextmanager
 from itertools import chain, repeat
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Union
 from datetime import datetime
 from typing import List
 
 import locale
 import calendar
+import re
 
 
 @contextmanager
-def localized(new_locale):
-    original_locale = '.'.join(locale.getlocale())
+def localized(new_locale: str):
+    original_locale = '.'.join(
+        p for p in locale.getlocale() if p)
     if new_locale == original_locale:
         yield
     else:
@@ -21,7 +24,7 @@ def localized(new_locale):
         locale.setlocale(locale.LC_ALL, original_locale)
 
 
-def crange(start, stop, modulo):
+def crange(start: int, stop: int, modulo: int):
     # Verificar argumentos
     if start > modulo:
         raise ValueError('Wrong arguments (start cannot be greater than modulo)')
@@ -34,7 +37,7 @@ def crange(start, stop, modulo):
         return range(start, stop)
 
 
-def nrange(start, n_steps, modulo):
+def nrange(start: int, n_steps: int, modulo: int):
     # Verificar argumentos
     if start > modulo:
         raise ValueError('Wrong arguments (start cannot be greater than modulo)')
@@ -48,7 +51,7 @@ def nrange(start, n_steps, modulo):
     return values
 
 
-class MonthsProcessor:
+class MonthsProcessor(object):
 
     with localized("en_US.UTF-8"):
         months_abbr = list(calendar.month_abbr)
@@ -56,6 +59,7 @@ class MonthsProcessor:
     with localized("en_US.UTF-8"):
         months_names = list(calendar.month_name)
 
+    # OBS: los índices indican el mes inicial de cada trimestre!!
     trimesters = ['', 'JFM', 'FMA', 'MAM', 'AMJ', 'MJJ', 'JJA', 'JAS', 'ASO', 'SON', 'OND', 'NDJ', 'DJF']
 
     @classmethod
@@ -72,60 +76,18 @@ class MonthsProcessor:
         return result if result != 0 else 12
 
     @classmethod
-    def n_days_in_trimester(cls, trimester: str, isleap: bool = False) -> int:
-        if trimester == 'JFM':
-            return calendar.mdays[1] + calendar.mdays[2] + calendar.mdays[3] + 1 if isleap else 0
-        elif trimester == 'FMA':
-            return calendar.mdays[2] + calendar.mdays[3] + calendar.mdays[4] + 1 if isleap else 0
-        elif trimester == 'MAM':
-            return calendar.mdays[3] + calendar.mdays[4] + calendar.mdays[5]
-        elif trimester == 'AMJ':
-            return calendar.mdays[4] + calendar.mdays[5] + calendar.mdays[6]
-        elif trimester == 'MJJ':
-            return calendar.mdays[5] + calendar.mdays[6] + calendar.mdays[7]
-        elif trimester == 'JJA':
-            return calendar.mdays[6] + calendar.mdays[7] + calendar.mdays[8]
-        elif trimester == 'JAS':
-            return calendar.mdays[7] + calendar.mdays[8] + calendar.mdays[9]
-        elif trimester == 'ASO':
-            return calendar.mdays[8] + calendar.mdays[9] + calendar.mdays[10]
-        elif trimester == 'SON':
-            return calendar.mdays[9] + calendar.mdays[10] + calendar.mdays[11]
-        elif trimester == 'OND':
-            return calendar.mdays[10] + calendar.mdays[11] + calendar.mdays[12]
-        elif trimester == 'NDJ':
-            return calendar.mdays[11] + calendar.mdays[12] + calendar.mdays[1]
-        elif trimester == 'DJF':
-            return calendar.mdays[12] + calendar.mdays[1] + calendar.mdays[2] + 1 if isleap else 0
-        return 0
+    def first_month_of_trimester(cls, trimester: str) -> int:
+        try:
+            return cls.trimesters.index(trimester)
+        except ValueError:
+            raise ValueError(f"Trimestre inválido: {trimester}")
 
     @classmethod
-    def first_month_of_trimester(cls, trimester: str) -> int:
-        if trimester == 'JFM':
-            return 1
-        elif trimester == 'FMA':
-            return 2
-        elif trimester == 'MAM':
-            return 3
-        elif trimester == 'AMJ':
-            return 4
-        elif trimester == 'MJJ':
-            return 5
-        elif trimester == 'JJA':
-            return 6
-        elif trimester == 'JAS':
-            return 7
-        elif trimester == 'ASO':
-            return 8
-        elif trimester == 'SON':
-            return 9
-        elif trimester == 'OND':
-            return 10
-        elif trimester == 'NDJ':
-            return 11
-        elif trimester == 'DJF':
-            return 12
-        return 0
+    def n_days_in_trimester(cls, trimester: str, isleap: bool = False) -> int:
+        first_month = cls.first_month_of_trimester(trimester)
+        months = nrange(first_month, 3, 12)
+        days_to_add = 1 if isleap and 2 in months else 0
+        return sum(calendar.mdays[m] for m in months) + days_to_add
 
     @classmethod
     def n_days_in_months(cls, fcst_year: int, fcst_month: int, trgt_months: List[int]) -> int:
@@ -155,3 +117,23 @@ class CPTpredictorFileInfo(object):
     start_date: datetime
     target_first_month_date: datetime
     target_last_month_date: datetime
+
+
+class FilesSearcher(object):
+
+    def __init__(self, target_files: list[Path]):
+        self.target_files: list[Path] = target_files
+
+    def filter_files(self, search_patterns: list[str]) -> list[Path]:
+
+        # Crear lista para almacenar los archivos seleccionados
+        desc_files: list[Path] = []
+
+        # Iterar sobre los patrones de búsqueda recibidos y seleccionar archivos
+        for regex in search_patterns:
+            pattern = re.compile(regex)  # compilar el patrón de búsqueda
+            c_desc_files = [p for p in self.target_files if p.is_file() and pattern.search(p.name)]
+            desc_files.extend(c_desc_files)  # Almacenar archivos seleccionados
+
+        # Retornar archivos que cumplen con los patrónes de búsqueda
+        return desc_files
