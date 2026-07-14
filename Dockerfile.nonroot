@@ -128,7 +128,7 @@ USER ${USR_NAME}
 # CONSTRUIR IMAGEN (NON-ROOT)
 # docker build \
 #   --tag nonroot-crcsas:latest \
-#   --build-arg BASE_IMAGE="ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0" \
+#   --build-arg BASE_IMAGE="ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0" \
 #   --build-arg USR_DIRS="/opt/files-processor" \
 #   --build-arg USER_UID=$(stat -c "%u" .) \
 #   --build-arg USER_GID=$(stat -c "%g" .) \

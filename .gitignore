@@ -161,3 +161,7 @@ cython_debug/
 
 # Test code
 pruebas/
+
+# Dev folder
+dev/*
+!dev/levantar_pycharm.sh

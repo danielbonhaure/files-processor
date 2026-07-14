@@ -83,6 +83,18 @@ RUN python3 -m pip install --upgrade pip && \
     python3 -m pip install --no-cache /wheels/* && \
     rm -rf /wheels
 
+# Renew ARGs
+# OBS: In both Podman and Docker, ENV variables always take precedence over ARG
+# variables of the same name. So, if the base image already contains ENV PYTHON_VERSION,
+# declaring ARG PYTHON_VERSION and passing --build-arg PYTHON_VERSION=* won't change
+# the original value of ENV PYTHON_VERSION of the base image.
+ARG PYTHON_VERSION
+
+# Set PYTHONPATH (https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH)
+# In Debian, Python packages are usually located in dist-packages, not site-packages.
+# Setting the PYTHONPATH environment variable tells applications where to find them.
+ENV PYTHONPATH=/usr/local/lib/python\${PYTHON_VERSION%.*}/site-packages
+
 
 
 ##########################################
@@ -315,33 +327,34 @@ WORKDIR ${FPROC_HOME}
 # CONSTRUIR IMAGEN (CORE)
 # docker build --force-rm \
 #   --target fproc-root \
-#   --tag ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0 \
+#   --tag ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0 \
+#   --label "org.opencontainers.image.description=Explicar últimos cambios." \
 #   --build-arg CRON_TIME_STR="0 0 18 * *" \
 #   --file Dockerfile .
 
 # LEVANTAR IMAGEN A GHCR
-# docker push ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0
+# docker push ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0
 
 # CORRER OPERACIONALMENTE CON CRON
 # docker run --name files-processor \
-#   --mount type=bind,src=/data/acc-cpt/output,dst=/opt/files-processor/descriptor_files/cpt-output \
-#   --mount type=bind,src=/data/acc-cpt/input/predictands,dst=/opt/files-processor/descriptor_files/cpt-obs-data \
-#   --mount type=bind,src=/data/acc-cpt/input/predictors,dst=/opt/files-processor/descriptor_files/cpt-predictors \
+#   --mount type=bind,src=/data/pycpt/output,dst=/opt/files-processor/descriptor_files/cpt-output \
+#   --mount type=bind,src=/data/pycpt/input/predictands,dst=/opt/files-processor/descriptor_files/cpt-obs-data \
+#   --mount type=bind,src=/data/pycpt/input/predictors,dst=/opt/files-processor/descriptor_files/cpt-predictors \
 #   --mount type=bind,src=/data/ereg/generados/nmme_output,dst=/opt/files-processor/descriptor_files/ereg-output \
-#   --detach ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0
+#   --detach ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0
 
 # CORRER MANUALMENTE
 # docker run --name files-processor \
-#   --mount type=bind,src=/data/acc-cpt/output,dst=/opt/files-processor/descriptor_files/cpt-output \
-#   --mount type=bind,src=/data/acc-cpt/input/predictands,dst=/opt/files-processor/descriptor_files/cpt-obs-data \
-#   --mount type=bind,src=/data/acc-cpt/input/predictors,dst=/opt/files-processor/descriptor_files/cpt-predictors \
+#   --mount type=bind,src=/data/pycpt/output,dst=/opt/files-processor/descriptor_files/cpt-output \
+#   --mount type=bind,src=/data/pycpt/input/predictands,dst=/opt/files-processor/descriptor_files/cpt-obs-data \
+#   --mount type=bind,src=/data/pycpt/input/predictors,dst=/opt/files-processor/descriptor_files/cpt-predictors \
 #   --mount type=bind,src=/data/ereg/generados/nmme_output,dst=/opt/files-processor/descriptor_files/ereg-output \
-#   --rm ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0 \
+#   --rm ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0 \
 # /usr/local/bin/python /opt/files-processor/main.py
 
 # CORRER ARCHIVOS DE PRUEBA MANUALMENTE
 # docker run --name files-processor \
 #   --mount type=bind,src=$(pwd)/descriptor_files,dst=/opt/files-processor/descriptor_files \
 #   --mount type=bind,src=$(pwd)/config.yaml,dst=/opt/files-processor/config.yaml \
-#   --rm ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0 \
+#   --rm ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0 \
 # /usr/local/bin/python /opt/files-processor/main.py

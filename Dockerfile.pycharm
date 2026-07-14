@@ -19,7 +19,10 @@ ARG BASE_IMAGE="fproc:latest"
 ARG PYCHARM_HOME="/opt/pycharm"
 
 # Set Pycharm version
-ARG PYCHARM_VERSION="2025.2"
+ARG PYCHARM_VERSION="2026.1.2"
+
+# Set custom PYTHONPATH
+ARG CUSTOM_PYTHONPATH=""
 
 
 
@@ -56,7 +59,7 @@ ARG PYCHARM_HOME
 ARG PYCHARM_VERSION
 
 # Download Pycharm IDE
-RUN wget https://download.jetbrains.com/python/pycharm-community-${PYCHARM_VERSION}.tar.gz -P /tmp/
+RUN wget https://download.jetbrains.com/python/pycharm-${PYCHARM_VERSION}.tar.gz -P /tmp/
 
 # Install PyCharm IDE
 RUN count=$(ls /tmp/pycharm-*.tar.gz | wc -l) && [ ${count} = 1 ] \
@@ -64,27 +67,21 @@ RUN count=$(ls /tmp/pycharm-*.tar.gz | wc -l) && [ ${count} = 1 ] \
     && tar xzf /tmp/pycharm-*.tar.gz -C ${PYCHARM_HOME} --strip-components 1 \
     || :  # para entender porque :, ver https://stackoverflow.com/a/49348392/5076110
 
-# Pycharm espera que los paquetes python estén en dist-packages, pero están en site-packages.
-# Esto es así porque python no se instaló usando apt o apt-get, y cuando esto ocurre, la carpeta
-# en la que se instalan los paquetes es site-packages y no dist-packages.
-RUN mkdir -p $(find /usr/local/lib -maxdepth 1 -type d -name 'python*')/dist-packages \
-    && ln -s $(find /usr/local/lib -maxdepth 1 -type d -name 'python*')/site-packages/* \
-             $(find /usr/local/lib -maxdepth 1 -type d -name 'python*')/dist-packages/
-
 # Add Pycharm to the System PATH
 ENV PATH="${PYCHARM_HOME}/bin:${PATH}"
 
-# Run PyCharm under Tini (https://github.com/krallin/tini#using-tini) -- Default (X11)
-# CMD ["pycharm", "-Dide.browser.jcef.enabled=true"]
-# or docker run your-image /your/program ...
+# Renew ARGs
+ARG CUSTOM_PYTHONPATH
 
-# Run PyCharm under Tini (https://github.com/krallin/tini#using-tini) -- X11
-# CMD ["pycharm", "-Dide.browser.jcef.enabled=true", "-Dawt.toolkit.name=XToolkit"]
-# or docker run your-image /your/program ...
+# Update the default PYTHONPATH (Only adds ':' if CUSTOM_PYTHONPATH is set)
+ENV PYTHONPATH="${CUSTOM_PYTHONPATH}${CUSTOM_PYTHONPATH:+:}${PYTHONPATH}"
 
-# Run PyCharm under Tini (https://github.com/krallin/tini#using-tini) -- Wayland
-# CMD ["pycharm", "-Dide.browser.jcef.enabled=true", "-Dawt.toolkit.name=WLToolkit"]
-# or docker run your-image /your/program ...
+# Check PYTHONPATH (https://docs.python.org/3/using/cmdline.html#envvar-PYTHONPATH)
+# The PYTHONPATH environment variable tells PyCharm where to find Python packages.
+RUN [ "${PYTHONPATH:-unset}" = "unset" ] \
+    && echo "Error: the CUSTOM_PYTHONPATH build argument must be set!" \
+    && exit 1 \
+    || :  # para entender porque :, ver https://stackoverflow.com/a/49348392/5076110
 
 # Run PyCharm under Tini (https://github.com/krallin/tini#using-tini)
 CMD ["pycharm", "--version"]
@@ -104,53 +101,26 @@ CMD ["pycharm", "--version"]
 
 
 # CONSTRUIR IMAGEN (PYCHARM CORE)
-# docker build \
+# podman build --format docker --force-rm \
 #   --tag pycharm-core:latest \
-#   --build-arg BASE_IMAGE="ghcr.io/danielbonhaure/files-processor:fproc-core-v1.0" \
+#   --build-arg BASE_IMAGE="ghcr.io/danielbonhaure/files-processor:fproc-core-vX.0" \
 #   --file Dockerfile.pycharm .
 
-# CONSTRUIR IMAGEN (PYCHARM NON-ROOT)
-# docker build \
-#   --tag pycharm-fproc:latest \
-#   --build-arg BASE_IMAGE="pycharm-core:latest" \
-#   --build-arg USER_UID=$(stat -c "%u" .) \
-#   --build-arg USER_GID=$(stat -c "%g" .) \
-#   --file Dockerfile.nonroot .
-
-
-# OBS: when using wayland, run "xhost +" first and "xhost -" after 
-#      for more info see: https://unix.stackexchange.com/q/593411
-#      or "xhost +SI:localuser:$(id -un)" instead
-#      for more info see: https://unix.stackexchange.com/a/359244
-# xhost +SI:localuser:"$(id -un)"
-
-
-# CORRER PYCHARM MANUALMENTE (X11)
-# docker run --rm \
-#   --name pycharm-fproc \
-#   --env DISPLAY=$DISPLAY \
-#   --mount type=bind,src=/tmp/.X11-unix,dst=/tmp/.X11-unix,readonly \
-#   --mount type=bind,src=$XDG_RUNTIME_DIR/at-spi/bus,dst=$XDG_RUNTIME_DIR/at-spi/bus,readonly \
-#   --privileged \
-#   --mount type=bind,src=$(pwd),dst=/opt/files-processor \
-#   --workdir /opt/files-processor \
-#   --entrypoint "" \
-#   --tty --interactive pycharm-fproc:latest  \
-# pycharm -Dide.browser.jcef.enabled=true -Dawt.toolkit.name=XToolkit -Dide.browser.jcef.log.level=verbose
-
 # CORRER PYCHARM MANUALMENTE (Wayland)
-# docker run --rm \
+# podman run --rm \
 #   --name pycharm-fproc \
 #   --env GDK_BACKEND=wayland --env QT_QPA_PLATFORM=wayland \
-#   --env WAYLAND_DISPLAY=$WAYLAND_DISPLAY --env XDG_RUNTIME_DIR=/tmp \
-#   --mount type=bind,src=$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY,dst=/tmp/$WAYLAND_DISPLAY,readonly \
-#   --mount type=bind,src=$XDG_RUNTIME_DIR/at-spi/bus,dst=$XDG_RUNTIME_DIR/at-spi/bus,readonly \
-#   --mount type=bind,src=/run/dbus/system_bus_socket,dst=/run/dbus/system_bus_socket,readonly \
-#   --env DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
-#   --mount type=bind,source=$XDG_RUNTIME_DIR/bus,dst=$XDG_RUNTIME_DIR/bus,readonly \
+#   --env XDG_SESSION_TYPE=wayland \
+#   --env XDG_RUNTIME_DIR=/run/user \
+#   --env DBUS_SESSION_BUS_ADDRESS=/run/user/bus \
+#   --env WAYLAND_DISPLAY=wayland-0 \
+#   --mount type=bind,source=$XDG_RUNTIME_DIR/bus,target=/run/user/bus,readonly \
+#   --mount type=bind,source=$XDG_RUNTIME_DIR/at-spi/bus,target=/run/user/at-spi/bus,readonly \
+#   --mount type=bind,source=$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY,target=/run/user/wayland-0,readonly \
+#   --mount type=bind,source=/run/dbus/system_bus_socket,target=/run/dbus/system_bus_socket,readonly \
 #   --privileged \
-#   --mount type=bind,src=$(pwd),dst=/opt/files-processor \
+#   --mount type=bind,src=$(pwd),dst=/opt/files-processor,relabel=shared \
 #   --workdir /opt/files-processor \
 #   --entrypoint "" \
-#   --tty --interactive pycharm-fproc:latest \
+#   --tty --interactive pycharm-core:latest \
 # pycharm -Dide.browser.jcef.enabled=false -Dawt.toolkit.name=WLToolkit -Dide.browser.jcef.log.level=verbose
